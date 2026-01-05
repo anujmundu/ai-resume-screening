@@ -1,6 +1,3 @@
-# AI Resume Screening System
-
-🚀 **Live Demo on Render:** [https://ai-resume-screening.onrender.com](https://ai-resume-screening.onrender.com)
 
 
 # AI Resume Screening System
