@@ -1,0 +1,19 @@
+venv/
+.venv/
+__pycache__/
+.env
+*.log
+resumes.db
+saas_platform.db
+temp_chrome_profile/
+.pytest_cache/
+
+# Helper & test generation scripts
+capture_25_screenshots.py
+create_and_screen_20_resumes.py
+backfill_data.py
+generate_diverse_resumes.py
+test_and_screen_diverse_roles.py
+test_enterprise_features.py
+apply_git_history.py
+
