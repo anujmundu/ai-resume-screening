@@ -1,0 +1,77 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{% block title %}AI Resume Screening Intelligence{% endblock %}</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}?v=3.1">
+    {% block head %}{% endblock %}
+</head>
+<body>
+    <header class="navbar">
+        <div class="nav-container">
+            <a href="/" class="brand-logo">
+                <div class="logo-icon">⚡</div>
+                <span>Talent<strong>AI</strong></span>
+            </a>
+            
+            <div class="nav-right-actions">
+                <div class="nav-status">
+                    <span class="status-indicator"></span>
+                    <span class="storage-badge">{{ storage_mode }}</span>
+                </div>
+                <button class="nav-toggle" id="navToggle" aria-label="Toggle Navigation Menu" aria-expanded="false">
+                    <span class="hamburger-bar"></span>
+                    <span class="hamburger-bar"></span>
+                    <span class="hamburger-bar"></span>
+                </button>
+            </div>
+
+            <nav class="nav-links" id="navLinks">
+                <a href="/" class="nav-link {% if request.path == '/' %}active{% endif %}">Overview</a>
+                <a href="/pipeline" class="nav-link {% if request.path == '/pipeline' %}active{% endif %}">📋 Pipeline</a>
+                <a href="/results" class="nav-link {% if request.path == '/results' %}active{% endif %}">Dashboard</a>
+                <a href="/vector-search" class="nav-link {% if request.path == '/vector-search' %}active{% endif %}">🔍 Vector Search</a>
+                <a href="/knowledge-graph" class="nav-link {% if request.path == '/knowledge-graph' %}active{% endif %}">🕸️ Knowledge Graph</a>
+                <a href="/analytics" class="nav-link {% if request.path == '/analytics' %}active{% endif %}">📈 Analytics</a>
+                <a href="/matrix" class="nav-link {% if request.path == '/matrix' %}active{% endif %}">Skill Matrix</a>
+                <a href="/screen-resume" class="nav-link {% if request.path == '/screen-resume' %}active{% endif %}">Text Screen</a>
+                <a href="/upload-resume" class="nav-link {% if request.path == '/upload-resume' %}active{% endif %}">Batch Upload</a>
+            </nav>
+        </div>
+        <div class="nav-backdrop" id="navBackdrop"></div>
+    </header>
+
+    <main class="main-content">
+        {% with messages = get_flashed_messages(with_categories=true) %}
+            {% if messages %}
+                <div class="flash-container">
+                    {% for category, message in messages %}
+                        <div class="flash-alert flash-{{ category }}">
+                            <span>{{ message }}</span>
+                            <button onclick="this.parentElement.remove()" class="flash-close">&times;</button>
+                        </div>
+                    {% endfor %}
+                </div>
+            {% endif %}
+        {% endwith %}
+
+        {% block content %}{% endblock %}
+    </main>
+
+    <footer class="footer">
+        <div class="footer-content">
+            <p>&copy; 2026 AI Resume Screening System &bull; Intelligent Talent Analytics</p>
+            <div class="footer-links">
+                <span>By Anuj Mundu</span>
+            </div>
+        </div>
+    </footer>
+
+    <script src="{{ url_for('static', filename='js/main.js') }}"></script>
+    {% block scripts %}{% endblock %}
+</body>
+</html>
