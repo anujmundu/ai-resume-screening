@@ -1,0 +1,78 @@
+{% extends "base.html" %}
+
+{% block title %}Overview &bull; AI Resume Screening Intelligence{% endblock %}
+
+{% block content %}
+<div class="hero-section">
+    <div class="hero-badge">AI-Powered Recruitment Engine</div>
+    <h1 class="hero-title">Screen Resumes in Seconds with High-Precision AI</h1>
+    <p class="hero-subtitle">
+        Automate candidate parsing, evaluate technical skills against Job Descriptions, and shortlist top talent with explainable scoring.
+    </p>
+
+    <div class="hero-actions">
+        <a href="/upload-resume" class="btn btn-primary btn-lg">
+            <svg width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12"></path></svg>
+            Upload Resumes (PDF, Word, OCR)
+        </a>
+        <a href="/screen-resume" class="btn btn-secondary btn-lg">
+            <svg width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path></svg>
+            Paste Text Resume
+        </a>
+    </div>
+</div>
+
+<div class="stats-overview-grid">
+    <div class="stat-card">
+        <div class="stat-icon-wrapper blue">📄</div>
+        <div class="stat-info">
+            <span class="stat-value">{{ total_resumes }}</span>
+            <span class="stat-label">Total Resumes Processed</span>
+        </div>
+    </div>
+    <div class="stat-card">
+        <div class="stat-icon-wrapper green">🎯</div>
+        <div class="stat-info">
+            <span class="stat-value">{{ shortlist_count }}</span>
+            <span class="stat-label">Candidates Shortlisted</span>
+        </div>
+    </div>
+    <div class="stat-card">
+        <div class="stat-icon-wrapper purple">⭐</div>
+        <div class="stat-info">
+            <span class="stat-value">{{ "%.1f"|format(avg_score) }}</span>
+            <span class="stat-label">Average Score</span>
+        </div>
+    </div>
+    <div class="stat-card">
+        <div class="stat-icon-wrapper amber">📈</div>
+        <div class="stat-info">
+            <span class="stat-value">{{ "%.1f"|format(shortlist_ratio) }}%</span>
+            <span class="stat-label">Shortlist Conversion</span>
+        </div>
+    </div>
+</div>
+
+<div class="features-grid">
+    <div class="feature-card">
+        <div class="feature-icon">🎯</div>
+        <h3>Job Description Matching</h3>
+        <p>Compare candidates against role-specific requirements, detecting matched vs. missing skills instantly.</p>
+    </div>
+    <div class="feature-card">
+        <div class="feature-icon">📑</div>
+        <h3>Multi-Format Support</h3>
+        <p>Accepts PDF, DOCX (Microsoft Word), PNG, JPG, and scanned PDFs with automatic OCR fallback.</p>
+    </div>
+    <div class="feature-card">
+        <div class="feature-icon">🔍</div>
+        <h3>Explainable AI Scoring</h3>
+        <p>Transparent 0–100 score breakdown across skills, experience, education, and profile completeness.</p>
+    </div>
+    <div class="feature-card">
+        <div class="feature-icon">📊</div>
+        <h3>Interactive Dashboard</h3>
+        <p>Filter candidates, search by skills, inspect detailed candidate profiles, and export results to CSV.</p>
+    </div>
+</div>
+{% endblock %}
