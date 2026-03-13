@@ -1,0 +1,129 @@
+{% extends "base.html" %}
+
+{% block title %}Upload Resumes &bull; AI Talent Intelligence{% endblock %}
+
+{% block content %}
+<div class="page-header">
+    <h1>Resume Document Screening</h1>
+    <p>Upload candidate resumes in PDF, Word (DOCX), or image formats. Multi-file upload supported for batch screening.</p>
+</div>
+
+<div class="card-container">
+    <form action="/upload-resume" method="POST" enctype="multipart/form-data" class="upload-form" id="uploadForm">
+        <div class="form-group mb-4">
+            <label for="job_description" class="form-label">
+                <span>Target Job Description (Optional)</span>
+                <span class="label-hint">Compare candidates against specific criteria</span>
+            </label>
+            <textarea 
+                id="job_description" 
+                name="job_description" 
+                class="form-control" 
+                rows="4" 
+                placeholder="Paste job description or select a preset below..."
+            ></textarea>
+            <div class="preset-pills">
+                <span class="preset-label">Quick Presets:</span>
+                <button type="button" class="preset-btn" onclick="applyPreset('fullstack')">Full Stack Dev</button>
+                <button type="button" class="preset-btn" onclick="applyPreset('datascience')">Data Scientist</button>
+                <button type="button" class="preset-btn" onclick="applyPreset('devops')">DevOps / Cloud</button>
+            </div>
+        </div>
+
+        <div class="drop-zone" id="dropZone">
+            <div class="drop-zone-content">
+                <div class="upload-cloud-icon">
+                    <svg width="48" height="48" fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 24 24"><path d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12"></path></svg>
+                </div>
+                <h3>Drag & Drop Resumes Here</h3>
+                <p>or <label for="resume_files" class="browse-link">browse files</label> on your device</p>
+                <input 
+                    type="file" 
+                    name="resume_files" 
+                    id="resume_files" 
+                    multiple 
+                    accept=".pdf,.docx,.doc,.png,.jpg,.jpeg,.txt" 
+                    class="file-input-hidden"
+                >
+                <div class="upload-hints">
+                    Supported: PDF, DOCX, PNG, JPG, JPEG &bull; Max 10MB per file &bull; Multiple files supported
+                </div>
+            </div>
+            <div id="fileList" class="selected-files-list"></div>
+        </div>
+
+        <div class="form-actions mt-4">
+            <button type="submit" class="btn btn-primary btn-lg" id="submitBtn" disabled>
+                <svg width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12"></path></svg>
+                Upload & Screen Candidates
+            </button>
+        </div>
+    </form>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+function applyPreset(role) {
+    const jdField = document.getElementById('job_description');
+    if (role === 'fullstack') {
+        jdField.value = "Looking for a Full Stack Developer with 3+ years of experience in Python, React, Node.js, TypeScript, PostgreSQL, Docker, and REST API development. Bachelor's or Master's in Computer Science.";
+    } else if (role === 'datascience') {
+        jdField.value = "Seeking a Data Scientist / ML Engineer proficient in Python, SQL, Pandas, NumPy, Scikit-learn, PyTorch, Machine Learning, Deep Learning, and data visualization. Master's/MCA preferred.";
+    } else if (role === 'devops') {
+        jdField.value = "We need a DevOps / Cloud Engineer with strong experience in Docker, Kubernetes, Linux, AWS, CI/CD pipelines, Git, and Python/Bash scripting.";
+    }
+}
+
+const dropZone = document.getElementById('dropZone');
+const fileInput = document.getElementById('resume_files');
+const fileList = document.getElementById('fileList');
+const submitBtn = document.getElementById('submitBtn');
+
+['dragenter', 'dragover'].forEach(eventName => {
+    dropZone.addEventListener(eventName, (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        dropZone.classList.add('drag-active');
+    }, false);
+});
+
+['dragleave', 'drop'].forEach(eventName => {
+    dropZone.addEventListener(eventName, (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        dropZone.classList.remove('drag-active');
+    }, false);
+});
+
+dropZone.addEventListener('drop', (e) => {
+    fileInput.files = e.dataTransfer.files;
+    updateFileList();
+});
+
+fileInput.addEventListener('change', updateFileList);
+
+function updateFileList() {
+    const files = fileInput.files;
+    fileList.innerHTML = '';
+    if (files.length > 0) {
+        submitBtn.disabled = false;
+        submitBtn.innerHTML = `Screen ${files.length} Resume${files.length > 1 ? 's' : ''}`;
+        
+        Array.from(files).forEach((file, index) => {
+            const item = document.createElement('div');
+            item.className = 'file-preview-pill';
+            item.innerHTML = `
+                <span class="file-pill-icon">📄</span>
+                <span class="file-pill-name">${file.name}</span>
+                <span class="file-pill-size">(${(file.size / 1024).toFixed(1)} KB)</span>
+            `;
+            fileList.appendChild(item);
+        });
+    } else {
+        submitBtn.disabled = true;
+        submitBtn.innerHTML = 'Upload & Screen Candidates';
+    }
+}
+</script>
+{% endblock %}
