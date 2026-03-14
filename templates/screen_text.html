@@ -1,0 +1,164 @@
+{% extends "base.html" %}
+
+{% block title %}Text Resume Screening &bull; AI Talent Intelligence{% endblock %}
+
+{% block content %}
+<div class="page-header">
+    <h1>Text-Based Resume Screening</h1>
+    <p>Paste candidate resume text directly. Optionally provide a Job Description to compute role alignment.</p>
+</div>
+
+<div class="card-container">
+    <form action="/screen-resume" method="POST" class="screening-form">
+        <div class="form-grid">
+            <div class="form-group">
+                <label for="job_description" class="form-label">
+                    <span>Target Job Description (Optional)</span>
+                    <span class="label-hint">Paste requirements to match skills</span>
+                </label>
+                <textarea 
+                    id="job_description" 
+                    name="job_description" 
+                    class="form-control" 
+                    rows="8" 
+                    placeholder="e.g. Looking for a Senior Python Developer with 3+ years of experience in Django, PostgreSQL, Docker, AWS, and REST APIs..."
+                >{{ job_description }}</textarea>
+                
+                <div class="preset-pills">
+                    <span class="preset-label">Quick Presets:</span>
+                    <button type="button" class="preset-btn" onclick="applyPreset('fullstack')">Full Stack Dev</button>
+                    <button type="button" class="preset-btn" onclick="applyPreset('datascience')">Data Scientist</button>
+                    <button type="button" class="preset-btn" onclick="applyPreset('devops')">DevOps / Cloud</button>
+                </div>
+            </div>
+
+            <div class="form-group">
+                <label for="resume_text" class="form-label">
+                    <span>Candidate Resume Text <strong class="text-danger">*</strong></span>
+                    <span class="label-hint">Paste full resume or bio</span>
+                </label>
+                <textarea 
+                    id="resume_text" 
+                    name="resume_text" 
+                    class="form-control" 
+                    rows="14" 
+                    required 
+                    placeholder="e.g. Jane Doe - Senior Software Engineer
+Email: jane.doe@example.com | Phone: +1 555-0199
+5+ years of software engineering experience in Python, FastAPI, Docker, and PostgreSQL.
+Education: M.Tech in Computer Science."
+                ></textarea>
+            </div>
+        </div>
+
+        <div class="form-actions">
+            <button type="submit" class="btn btn-primary btn-lg">
+                <svg width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M13 10V3L4 14h7v7l9-11h-7z"></path></svg>
+                Screen Resume Now
+            </button>
+        </div>
+    </form>
+</div>
+
+{% if result %}
+<div class="result-card-container">
+    <div class="card result-card">
+        <div class="result-header">
+            <div>
+                <h2>{{ result.data.candidate_name }}</h2>
+                <div class="candidate-meta">
+                    {% if result.data.email %}<span>📧 {{ result.data.email }}</span>{% endif %}
+                    {% if result.data.phone %}<span>📞 {{ result.data.phone }}</span>{% endif %}
+                    {% if result.data.education %}<span>🎓 {{ result.data.education }}</span>{% endif %}
+                    <span>⏳ {{ result.data.experience_years }} years exp</span>
+                </div>
+            </div>
+            <div class="decision-badge badge-{{ result.decision }}">
+                <span class="score-display">{{ result.score }} / 100</span>
+                <span class="decision-label">{{ result.decision|upper }}</span>
+            </div>
+        </div>
+
+        <div class="score-breakdown-bar">
+            <div class="breakdown-item">
+                <span class="breakdown-label">Skills (40 max)</span>
+                <span class="breakdown-value">{{ result.score_breakdown.skills }}</span>
+            </div>
+            <div class="breakdown-item">
+                <span class="breakdown-label">Experience (30 max)</span>
+                <span class="breakdown-value">{{ result.score_breakdown.experience }}</span>
+            </div>
+            <div class="breakdown-item">
+                <span class="breakdown-label">Education (15 max)</span>
+                <span class="breakdown-value">{{ result.score_breakdown.education }}</span>
+            </div>
+            <div class="breakdown-item">
+                <span class="breakdown-label">Profile (15 max)</span>
+                <span class="breakdown-value">{{ result.score_breakdown.profile }}</span>
+            </div>
+        </div>
+
+        <div class="result-body">
+            <div class="result-section">
+                <h4>Skills Detected</h4>
+                <div class="skills-wrap">
+                    {% for skill in result.data.skills %}
+                        <span class="skill-tag">{{ skill }}</span>
+                    {% else %}
+                        <span class="text-muted">No specific skills parsed</span>
+                    {% endfor %}
+                </div>
+            </div>
+
+            {% if result.data.matched_skills %}
+            <div class="result-section">
+                <h4>JD Matched Skills</h4>
+                <div class="skills-wrap">
+                    {% for skill in result.data.matched_skills %}
+                        <span class="skill-tag match">{{ skill }}</span>
+                    {% endfor %}
+                </div>
+            </div>
+            {% endif %}
+
+            {% if result.data.missing_skills %}
+            <div class="result-section">
+                <h4>Missing Target Skills</h4>
+                <div class="skills-wrap">
+                    {% for skill in result.data.missing_skills %}
+                        <span class="skill-tag missing">{{ skill }}</span>
+                    {% endfor %}
+                </div>
+            </div>
+            {% endif %}
+
+            {% if result.data.summary %}
+            <div class="result-section">
+                <h4>Candidate Summary</h4>
+                <p class="summary-text">{{ result.data.summary }}</p>
+            </div>
+            {% endif %}
+        </div>
+
+        <div class="result-footer">
+            <a href="/results" class="btn btn-secondary">View All Results in Dashboard</a>
+        </div>
+    </div>
+</div>
+{% endif %}
+{% endblock %}
+
+{% block scripts %}
+<script>
+function applyPreset(role) {
+    const jdField = document.getElementById('job_description');
+    if (role === 'fullstack') {
+        jdField.value = "Looking for a Full Stack Developer with 3+ years of experience in Python, React, Node.js, TypeScript, PostgreSQL, Docker, and REST API development. Bachelor's or Master's in Computer Science.";
+    } else if (role === 'datascience') {
+        jdField.value = "Seeking a Data Scientist / ML Engineer proficient in Python, SQL, Pandas, NumPy, Scikit-learn, PyTorch, Machine Learning, Deep Learning, and data visualization. Master's/MCA preferred.";
+    } else if (role === 'devops') {
+        jdField.value = "We need a DevOps / Cloud Engineer with strong experience in Docker, Kubernetes, Linux, AWS, CI/CD pipelines, Git, and Python/Bash scripting.";
+    }
+}
+</script>
+{% endblock %}
