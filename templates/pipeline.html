@@ -1,0 +1,758 @@
+{% extends "base.html" %}
+
+{% block title %}Hiring Pipeline & ATS Kanban &bull; AI Talent Screening{% endblock %}
+
+{% block content %}
+<div class="pipeline-header">
+    <div>
+        <div class="breadcrumb-trail">
+            <a href="/results">Dashboard</a> &bull; <span>Visual ATS Pipeline</span>
+        </div>
+        <h1>Candidate Hiring Pipeline</h1>
+        <p>Interactive drag-and-drop Kanban workflow. Move candidates across stages to trigger automated recruiter actions.</p>
+    </div>
+    <div class="dashboard-actions">
+        <a href="/analytics" class="btn btn-secondary">
+            <svg width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"></path></svg>
+            Analytics & Insights
+        </a>
+        <a href="/results" class="btn btn-outline">
+            <svg width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M4 6h16M4 10h16M4 14h16M4 18h16"></path></svg>
+            Table View
+        </a>
+        <a href="/upload-resume" class="btn btn-primary">
+            <svg width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M12 4v16m8-8H4"></path></svg>
+            Screen Resumes
+        </a>
+    </div>
+</div>
+
+<!-- Quick Search & Stage Filter -->
+<div class="pipeline-controls">
+    <div class="search-box" style="flex: 1; max-width: 420px;">
+        <svg width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"></path></svg>
+        <input type="text" id="pipelineSearch" placeholder="Filter cards by name, skill, or role..." onkeyup="filterKanban()">
+    </div>
+    <div class="pipeline-stats-pill">
+        <span>Total in Workflow: <strong>{{ candidates|length }}</strong> candidates</span>
+    </div>
+</div>
+
+<!-- Mobile Stage Filter / Quick Jump Tabs -->
+<div class="mobile-stage-tabs" id="mobileStageTabs">
+    <button type="button" class="stage-tab-btn active" data-stage="all" onclick="selectMobileStage('all')">All ({{ candidates|length }})</button>
+    <button type="button" class="stage-tab-btn" data-stage="screened" onclick="selectMobileStage('screened')">📥 Screened</button>
+    <button type="button" class="stage-tab-btn" data-stage="shortlisted" onclick="selectMobileStage('shortlisted')">⭐ Shortlisted</button>
+    <button type="button" class="stage-tab-btn" data-stage="phone_screen" onclick="selectMobileStage('phone_screen')">📞 Phone</button>
+    <button type="button" class="stage-tab-btn" data-stage="tech_interview" onclick="selectMobileStage('tech_interview')">💻 Tech</button>
+    <button type="button" class="stage-tab-btn" data-stage="offer" onclick="selectMobileStage('offer')">🎉 Offer</button>
+    <button type="button" class="stage-tab-btn" data-stage="rejected" onclick="selectMobileStage('rejected')">❌ Rejected</button>
+</div>
+
+<!-- Interactive Kanban Board -->
+<div class="kanban-board-container" id="kanbanBoard">
+    {% set stages = [
+        {"key": "screened", "name": "Screened", "icon": "📥", "color": "blue"},
+        {"key": "shortlisted", "name": "Shortlisted", "icon": "⭐", "color": "purple"},
+        {"key": "phone_screen", "name": "Phone Screen", "icon": "📞", "color": "amber"},
+        {"key": "tech_interview", "name": "Tech Interview", "icon": "💻", "color": "cyan"},
+        {"key": "offer", "name": "Offer Stage", "icon": "🎉", "color": "green"},
+        {"key": "rejected", "name": "Rejected", "icon": "❌", "color": "rose"}
+    ] %}
+
+    <div class="kanban-columns-grid">
+        {% for st in stages %}
+            {% set col_candidates = candidates|selectattr("stage", "equalto", st.key)|list %}
+            <div class="kanban-column column-{{ st.color }}" 
+                 data-stage="{{ st.key }}"
+                 ondragover="handleDragOver(event)" 
+                 ondragleave="handleDragLeave(event)" 
+                 ondrop="handleDrop(event, '{{ st.key }}')">
+                <div class="kanban-column-header">
+                    <div class="column-title-wrap">
+                        <span class="column-icon">{{ st.icon }}</span>
+                        <h3>{{ st.name }}</h3>
+                    </div>
+                    <span class="column-count-badge" id="count-{{ st.key }}">{{ col_candidates|length }}</span>
+                </div>
+
+                <div class="kanban-cards-list" id="col-list-{{ st.key }}">
+                    {% for c in col_candidates %}
+                    {% set d = c.data %}
+                    <div class="kanban-card card-decision-{{ c.decision }}" 
+                         id="card-{{ c._id }}" 
+                         data-id="{{ c._id }}"
+                         data-name="{{ d.candidate_name or 'Candidate' }}"
+                         data-skills="{{ (d.skills or [])|join(' ') }}"
+                         draggable="true" 
+                         ondragstart="handleDragStart(event, '{{ c._id }}')">
+                        
+                        <div class="card-top-meta">
+                            <span class="card-name">{{ d.candidate_name or "Candidate" }}</span>
+                            <span class="card-score-pill score-pill-{{ c.decision }}">{{ c.score }}/100</span>
+                        </div>
+
+                        <div class="card-mid-meta">
+                            <span class="card-exp">⏳ {{ d.experience_years }} yrs</span>
+                            {% if c.integrity_score %}
+                                <span class="card-integrity" title="Integrity & Consistency Rating">
+                                    🛡️ {{ c.integrity_score }}%
+                                </span>
+                            {% endif %}
+                            {% if c.semantic_fit and c.semantic_fit > 0 %}
+                                <span class="card-semantic">🎯 {{ "%.0f"|format(c.semantic_fit) }}%</span>
+                            {% endif %}
+                        </div>
+
+                        <div class="card-skills-row">
+                            {% for s in (d.skills or [])[:3] %}
+                                <span class="skill-tag-sm">{{ s }}</span>
+                            {% endfor %}
+                            {% if (d.skills or [])|length > 3 %}
+                                <span class="skill-tag-more">+{{ (d.skills or [])|length - 3 }}</span>
+                            {% endif %}
+                        </div>
+
+                        <div class="card-footer-actions">
+                            <button type="button" class="card-btn" onclick="openCandidateModal('{{ c._id }}')" title="Full Profile & Audit">
+                                👁️ Profile
+                            </button>
+                            <a href="/candidate/{{ c._id }}/dossier" class="card-btn" title="Download Executive PDF Dossier">
+                                📄 Dossier
+                            </a>
+                        </div>
+                    </div>
+                    {% endfor %}
+                </div>
+            </div>
+        {% endfor %}
+    </div>
+</div>
+
+<!-- Candidate Quick-View / Audit Modal (Shared with Dashboard) -->
+<div id="candidateModal" class="modal">
+    <div class="modal-content">
+        <div class="modal-header">
+            <div>
+                <h2 id="modalCandidateName">Candidate Details</h2>
+                <div id="modalMeta" class="modal-meta-row"></div>
+            </div>
+            <div class="modal-header-actions">
+                <a id="modalDossierBtn" href="#" class="btn btn-sm btn-outline">
+                    <svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path></svg>
+                    PDF Dossier
+                </a>
+                <button class="modal-close" onclick="closeModal('candidateModal')">&times;</button>
+            </div>
+        </div>
+
+        <div class="modal-tabs">
+            <button class="tab-btn active" onclick="switchModalTab('overview')">📋 Profile & Questions</button>
+            <button class="tab-btn" onclick="switchModalTab('audit')">🕵️ Integrity & Red Flags</button>
+            <button class="tab-btn" onclick="switchModalTab('prescreen')">🎙️ Pre-Screen Simulator</button>
+            <button class="tab-btn" onclick="switchModalTab('multiagent')">🧠 Multi-Agent 360°</button>
+            <button class="tab-btn" onclick="switchModalTab('copilot')">💬 Recruiter Copilot</button>
+            <button class="tab-btn" onclick="switchModalTab('email')">✉️ Outreach</button>
+        </div>
+
+        <div class="modal-body" id="modalBody">
+            <div class="modal-loading">Loading candidate profile...</div>
+        </div>
+    </div>
+</div>
+
+<!-- Toast Action Notification Container -->
+<div id="actionToastContainer" class="action-toast-container"></div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+let draggedCandidateId = null;
+let currentCandidateId = null;
+let currentCandidateData = null;
+
+function handleDragStart(e, candidateId) {
+    draggedCandidateId = candidateId;
+    e.dataTransfer.setData('text/plain', candidateId);
+    e.dataTransfer.effectAllowed = 'move';
+    const card = document.getElementById('card-' + candidateId);
+    if (card) card.classList.add('is-dragging');
+}
+
+function handleDragOver(e) {
+    e.preventDefault();
+    e.dataTransfer.dropEffect = 'move';
+    const col = e.currentTarget;
+    col.classList.add('drag-active');
+}
+
+function handleDragLeave(e) {
+    e.currentTarget.classList.remove('drag-active');
+}
+
+function handleDrop(e, newStage) {
+    e.preventDefault();
+    e.currentTarget.classList.remove('drag-active');
+
+    const candidateId = draggedCandidateId || e.dataTransfer.getData('text/plain');
+    if (!candidateId) return;
+
+    const card = document.getElementById('card-' + candidateId);
+    if (card) card.classList.remove('is-dragging');
+
+    const targetList = document.getElementById('col-list-' + newStage);
+    if (card && targetList) {
+        targetList.prepend(card);
+        updateColumnCounts();
+    }
+
+    // Persist stage update via API
+    fetch(`/candidate/${candidateId}/stage`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ stage: newStage })
+    })
+    .then(res => res.json())
+    .then(data => {
+        showStageToast(card ? card.getAttribute('data-name') : 'Candidate', newStage);
+    })
+    .catch(err => {
+        console.error('Stage update failed', err);
+    });
+}
+
+function updateColumnCounts() {
+    const stages = ['screened', 'shortlisted', 'phone_screen', 'tech_interview', 'offer', 'rejected'];
+    stages.forEach(st => {
+        const list = document.getElementById('col-list-' + st);
+        const countBadge = document.getElementById('count-' + st);
+        if (list && countBadge) {
+            countBadge.innerText = list.children.length;
+        }
+    });
+}
+
+function showStageToast(name, stage) {
+    const toastContainer = document.getElementById('actionToastContainer');
+    const toast = document.createElement('div');
+    toast.className = 'action-toast toast-' + stage;
+
+    const messages = {
+        'screened': `Moved <strong>${name}</strong> to Screened. Ready for initial evaluation.`,
+        'shortlisted': `⭐ <strong>${name}</strong> shortlisted! Consider generating outreach invite.`,
+        'phone_screen': `📞 <strong>${name}</strong> ready for Phone Screen. Calendar invitation suggested.`,
+        'tech_interview': `💻 <strong>${name}</strong> advanced to Tech Interview! Try running the Pre-Screen Simulator.`,
+        'offer': `🎉 <strong>${name}</strong> moved to Offer! Executive PDF dossier available.`,
+        'rejected': `❌ <strong>${name}</strong> marked Rejected. Feedback email draft available.`
+    };
+
+    toast.innerHTML = `
+        <div class="toast-content">${messages[stage] || `Moved ${name} to ${stage}`}</div>
+        <button class="toast-close" onclick="this.parentElement.remove()">&times;</button>
+    `;
+    toastContainer.appendChild(toast);
+
+    setTimeout(() => {
+        toast.classList.add('toast-fade-out');
+        setTimeout(() => toast.remove(), 400);
+    }, 4500);
+}
+
+function filterKanban() {
+    const query = document.getElementById('pipelineSearch').value.toLowerCase().trim();
+    const cards = document.querySelectorAll('.kanban-card');
+
+    cards.forEach(card => {
+        const name = (card.getAttribute('data-name') || '').toLowerCase();
+        const skills = (card.getAttribute('data-skills') || '').toLowerCase();
+        if (!query || name.includes(query) || skills.includes(query)) {
+            card.style.display = '';
+        } else {
+            card.style.display = 'none';
+        }
+    });
+}
+
+// Modal inspection logic
+function openCandidateModal(id) {
+    currentCandidateId = id;
+    const modal = document.getElementById('candidateModal');
+    const modalBody = document.getElementById('modalBody');
+    const dossierBtn = document.getElementById('modalDossierBtn');
+
+    modal.style.display = 'flex';
+    modalBody.innerHTML = '<div class="modal-loading">Loading candidate profile...</div>';
+    dossierBtn.href = `/candidate/${id}/dossier`;
+
+    fetch(`/candidate/${id}`)
+        .then(res => res.json())
+        .then(res => {
+            if (!res || !res.data) {
+                modalBody.innerHTML = '<p class="text-danger">Failed to load candidate details.</p>';
+                return;
+            }
+            currentCandidateData = res;
+            switchModalTab('overview');
+        })
+        .catch(err => {
+            modalBody.innerHTML = `<p class="text-danger">Error: ${err.message}</p>`;
+        });
+}
+
+function switchModalTab(tabName) {
+    document.querySelectorAll('.modal-tabs .tab-btn').forEach(btn => btn.classList.remove('active'));
+    const btnMatch = Array.from(document.querySelectorAll('.modal-tabs .tab-btn')).find(b => b.getAttribute('onclick').includes(tabName));
+    if (btnMatch) btnMatch.classList.add('active');
+
+    if (tabName === 'overview') renderModalOverview();
+    else if (tabName === 'audit') renderModalAudit();
+    else if (tabName === 'prescreen') renderModalPreScreen();
+    else if (tabName === 'multiagent') renderModalMultiAgent();
+    else if (tabName === 'copilot') renderModalCopilot();
+    else if (tabName === 'email') renderModalEmail();
+}
+
+function renderModalOverview() {
+    const res = currentCandidateData;
+    const d = res.data;
+    const b = res.score_breakdown || {};
+    document.getElementById('modalCandidateName').innerText = d.candidate_name || 'Candidate';
+    document.getElementById('modalMeta').innerHTML = `
+        ${d.email ? `<span>📧 ${d.email}</span>` : ''}
+        ${d.phone ? `<span>📞 ${d.phone}</span>` : ''}
+        <span>⏳ ${d.experience_years} years</span>
+        <span>🎓 ${d.education || 'N/A'}</span>
+    `;
+
+    const questions = d.interview_questions || res.interview_questions || [];
+    let qHtml = '';
+    if (questions.length) {
+        qHtml = `
+            <div class="modal-section">
+                <h4>🎯 Tailored Technical Questions</h4>
+                <div class="questions-list">
+                    ${questions.map((q, i) => `
+                        <div class="question-card">
+                            <div class="question-q"><strong>Q${i+1}:</strong> ${q.question}</div>
+                            <div class="question-focus"><strong>Focus:</strong> ${q.focus_area}</div>
+                        </div>
+                    `).join('')}
+                </div>
+            </div>
+        `;
+    }
+
+    document.getElementById('modalBody').innerHTML = `
+        <div class="modal-score-banner badge-${res.decision}">
+            <div>
+                <div class="modal-score-num">${res.score} / 100</div>
+                <div class="modal-decision-label">Status: ${res.decision.toUpperCase()}</div>
+            </div>
+            <div class="modal-score-chips">
+                <span>Skills: ${b.skills || 0}/35</span>
+                <span>Experience: ${b.experience || 0}/25</span>
+                <span>Education: ${b.education || 0}/15</span>
+                ${res.semantic_fit ? `<span>Semantic: ${res.semantic_fit}%</span>` : ''}
+                ${res.integrity_score ? `<span>Integrity: ${res.integrity_score}%</span>` : ''}
+            </div>
+        </div>
+        ${d.summary ? `<div class="modal-section"><h4>Summary</h4><p class="summary-text">${d.summary}</p></div>` : ''}
+        <div class="modal-section">
+            <h4>Skills Detected</h4>
+            <div class="skills-wrap">
+                ${(d.skills || []).map(s => `<span class="skill-tag">${s}</span>`).join('') || '<span class="text-muted">None</span>'}
+            </div>
+        </div>
+        ${qHtml}
+    `;
+}
+
+function renderModalAudit() {
+    const res = currentCandidateData;
+    const audit = res.audit_report || {};
+    const score = res.integrity_score || audit.integrity_score || 95;
+    const flags = audit.flags || [];
+    const unverified = audit.unverified_skills || [];
+
+    document.getElementById('modalBody').innerHTML = `
+        <div class="audit-dashboard-card">
+            <div class="audit-header-flex">
+                <div>
+                    <h3>🛡️ Resume Red Flag & Consistency Audit</h3>
+                    <p class="text-muted">Automated verification of employment chronology, career gaps, tenure stability, and buzzword stuffing.</p>
+                </div>
+                <div class="audit-gauge-pill ${score >= 80 ? 'gauge-good' : (score >= 60 ? 'gauge-warn' : 'gauge-bad')}">
+                    <span class="gauge-num">${score}%</span>
+                    <span class="gauge-label">Integrity Rating</span>
+                </div>
+            </div>
+
+            <div class="audit-flags-container">
+                <h4>Audit Findings & Alerts (${flags.length})</h4>
+                <div class="audit-flags-list">
+                    ${flags.map(f => `
+                        <div class="audit-flag-card flag-${f.type}">
+                            <span class="flag-icon">${f.type === 'danger' ? '🚨' : (f.type === 'warning' ? '⚠️' : '✅')}</span>
+                            <div class="flag-content">
+                                <strong>${f.category}:</strong> ${f.message}
+                            </div>
+                        </div>
+                    `).join('') || '<p class="text-muted">No red flags identified.</p>'}
+                </div>
+            </div>
+
+            ${unverified.length ? `
+                <div class="audit-section mt-3">
+                    <h4>Unevidenced Skills (Listed without project context)</h4>
+                    <div class="skills-wrap">
+                        ${unverified.map(s => `<span class="skill-tag-sm skill-unverified">${s}</span>`).join('')}
+                    </div>
+                </div>
+            ` : ''}
+
+            <div class="audit-section mt-3">
+                <h4>Tenure Analysis</h4>
+                <p class="text-muted">${audit.tenure_summary || 'Standard historical tenure profile.'}</p>
+            </div>
+        </div>
+    `;
+}
+
+function renderModalPreScreen() {
+    const res = currentCandidateData;
+    const questions = res.data.interview_questions || res.interview_questions || [];
+
+    if (!questions.length) {
+        document.getElementById('modalBody').innerHTML = `
+            <div class="empty-prescreen">
+                <p>No customized interview questions available for this candidate.</p>
+            </div>
+        `;
+        return;
+    }
+
+    document.getElementById('modalBody').innerHTML = `
+        <div class="prescreen-container">
+            <div class="prescreen-intro">
+                <h3>🎙️ AI Technical Pre-Screening Simulator</h3>
+                <p class="text-muted">Simulate a live pre-screen interview. Type candidate answers or use the microphone for speech-to-text dictation to get instant scoring and interviewer drill-down notes.</p>
+            </div>
+
+            <div class="prescreen-questions-accordion">
+                ${questions.map((q, idx) => `
+                    <div class="prescreen-card" id="prescreen-card-${idx}">
+                        <div class="prescreen-card-header">
+                            <span class="q-badge">Question ${idx + 1}</span>
+                            <h4>${q.question}</h4>
+                        </div>
+                        <div class="prescreen-context">
+                            <span><strong>Target Focus:</strong> ${q.focus_area}</span>
+                            <div class="listen-for-box">
+                                <span>💡 <strong>Listen For:</strong> ${q.suggested_answer}</span>
+                            </div>
+                        </div>
+
+                        <div class="prescreen-input-zone">
+                            <textarea id="answer-input-${idx}" class="form-control" rows="3" placeholder="Type candidate's verbal response, or click 'Speak Answer' to dictate live..."></textarea>
+                            <div class="prescreen-action-bar">
+                                <button type="button" class="btn btn-sm btn-outline mic-btn" id="mic-btn-${idx}" onclick="toggleVoiceDictation(${idx})">
+                                    🎙️ Speak Answer
+                                </button>
+                                <button type="button" class="btn btn-sm btn-primary" onclick="submitAnswerEvaluation(${idx})">
+                                    ⚡ Evaluate with AI
+                                </button>
+                            </div>
+                        </div>
+
+                        <div class="prescreen-eval-result" id="eval-result-${idx}" style="display: none;"></div>
+                    </div>
+                `).join('')}
+            </div>
+        </div>
+    `;
+}
+
+let speechRecognizer = null;
+let activeMicIdx = null;
+
+function toggleVoiceDictation(idx) {
+    if (!('webkitSpeechRecognition' in window) && !('SpeechRecognition' in window)) {
+        alert('Web Speech API is not supported in this browser. Please use Chrome/Edge or type the response directly.');
+        return;
+    }
+
+    const micBtn = document.getElementById('mic-btn-' + idx);
+    const textarea = document.getElementById('answer-input-' + idx);
+
+    if (speechRecognizer && activeMicIdx === idx) {
+        speechRecognizer.stop();
+        speechRecognizer = null;
+        activeMicIdx = null;
+        micBtn.classList.remove('mic-recording');
+        micBtn.innerText = '🎙️ Speak Answer';
+        return;
+    }
+
+    const SpeechClass = window.SpeechRecognition || window.webkitSpeechRecognition;
+    speechRecognizer = new SpeechClass();
+    speechRecognizer.continuous = true;
+    speechRecognizer.interimResults = true;
+    activeMicIdx = idx;
+
+    micBtn.classList.add('mic-recording');
+    micBtn.innerText = '🔴 Listening... (Click to stop)';
+
+    speechRecognizer.onresult = (event) => {
+        let transcript = '';
+        for (let i = event.resultIndex; i < event.results.length; ++i) {
+            transcript += event.results[i][0].transcript;
+        }
+        textarea.value = (textarea.value + ' ' + transcript).trim();
+    };
+
+    speechRecognizer.onerror = (e) => {
+        console.error('Speech recognition error', e);
+        micBtn.classList.remove('mic-recording');
+        micBtn.innerText = '🎙️ Speak Answer';
+        speechRecognizer = null;
+    };
+
+    speechRecognizer.onend = () => {
+        micBtn.classList.remove('mic-recording');
+        micBtn.innerText = '🎙️ Speak Answer';
+        speechRecognizer = null;
+        activeMicIdx = null;
+    };
+
+    speechRecognizer.start();
+}
+
+function submitAnswerEvaluation(idx) {
+    const res = currentCandidateData;
+    const q = (res.data.interview_questions || res.interview_questions || [])[idx];
+    const answer = document.getElementById('answer-input-' + idx).value.trim();
+    const resultBox = document.getElementById('eval-result-' + idx);
+
+    if (!answer) {
+        alert('Please provide or dictate an answer first.');
+        return;
+    }
+
+    resultBox.style.display = 'block';
+    resultBox.innerHTML = '<div class="modal-loading">⚡ Evaluating answer against technical benchmarks...</div>';
+
+    fetch(`/candidate/${currentCandidateId}/evaluate-answer`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+            question_index: idx,
+            question: q.question,
+            focus_area: q.focus_area,
+            suggested_answer: q.suggested_answer,
+            candidate_answer: answer
+        })
+    })
+    .then(r => r.json())
+    .then(data => {
+        resultBox.innerHTML = `
+            <div class="eval-card eval-badge-${data.verdict_badge}">
+                <div class="eval-top">
+                    <span class="eval-score-pill">${data.score} / 10</span>
+                    <span class="eval-verdict-title">${data.verdict}</span>
+                </div>
+                <div class="eval-body-grid">
+                    <div class="eval-subcol">
+                        <strong>✅ Strengths Identified:</strong>
+                        <ul>${data.strengths.map(s => `<li>${s}</li>`).join('')}</ul>
+                    </div>
+                    ${data.gaps && data.gaps.length ? `
+                        <div class="eval-subcol">
+                            <strong>⚠️ Identified Gaps:</strong>
+                            <ul>${data.gaps.map(g => `<li>${g}</li>`).join('')}</ul>
+                        </div>
+                    ` : ''}
+                </div>
+                <div class="eval-drilldown">
+                    <strong>🔍 Next Round Drill-Down Recommendation:</strong>
+                    <p>${data.drill_down}</p>
+                </div>
+            </div>
+        `;
+    })
+    .catch(err => {
+        resultBox.innerHTML = `<p class="text-danger">Evaluation failed: ${err.message}</p>`;
+    });
+}
+
+function renderModalMultiAgent() {
+    const res = currentCandidateData;
+    const scorecard = res.multi_agent_scorecard || {};
+    const agents = scorecard.agents || [];
+    const consensus = scorecard.consensus_score || res.score || 85;
+
+    document.getElementById('modalBody').innerHTML = `
+        <div class="multiagent-container">
+            <div class="multiagent-header">
+                <div>
+                    <h3>🧠 Multi-Agent 360° Evaluation Panel</h3>
+                    <p class="text-muted">Independent multi-persona audit by 3 specialized AI agents reconciled by an AI Lead Supervisor.</p>
+                </div>
+                <div class="consensus-badge">
+                    <span class="consensus-num">${consensus} / 100</span>
+                    <span class="consensus-label">360° Consensus Score</span>
+                </div>
+            </div>
+
+            <div class="supervisor-banner">
+                <div class="supervisor-icon">👑</div>
+                <div class="supervisor-text">
+                    <strong>Lead Supervisor Reconciled Verdict:</strong>
+                    <p>${scorecard.supervisor_summary || 'Candidate demonstrated balanced capability across code quality, scalability, and delivery.'}</p>
+                </div>
+            </div>
+
+            <div class="agents-grid">
+                ${agents.map(a => `
+                    <div class="agent-review-card">
+                        <div class="agent-card-top">
+                            <span class="agent-avatar">${a.agent_icon}</span>
+                            <div>
+                                <h4>${a.agent_name}</h4>
+                                <span class="agent-score-tag">${a.score} / 10.0</span>
+                            </div>
+                        </div>
+                        <p class="agent-card-assessment">${a.assessment}</p>
+                    </div>
+                `).join('')}
+            </div>
+        </div>
+    `;
+}
+
+function renderModalCopilot() {
+    document.getElementById('modalBody').innerHTML = `
+        <div class="copilot-container">
+            <div class="copilot-header">
+                <span class="copilot-avatar">🤖</span>
+                <div>
+                    <h4>Recruiter Copilot</h4>
+                    <p class="text-muted">Ask questions about this candidate's background or qualifications.</p>
+                </div>
+            </div>
+            <div class="copilot-chat-history" id="copilotChatHistory">
+                <div class="copilot-message copilot-bot">Hello! I'm your AI Recruiter Copilot. Ask me anything about this candidate's resume.</div>
+            </div>
+            <div class="copilot-input-bar">
+                <input type="text" id="copilotInput" placeholder="Ask a question..." onkeypress="if(event.key === 'Enter') sendCopilotQuestion()">
+                <button type="button" class="btn btn-primary btn-sm" onclick="sendCopilotQuestion()">Ask</button>
+            </div>
+        </div>
+    `;
+}
+
+function sendCopilotQuestion() {
+    const input = document.getElementById('copilotInput');
+    const question = input.value.trim();
+    if (!question) return;
+
+    const history = document.getElementById('copilotChatHistory');
+    history.innerHTML += `<div class="copilot-message copilot-user">${question}</div>`;
+    input.value = '';
+    history.scrollTop = history.scrollHeight;
+
+    const loadingId = 'copilot-loading-' + Date.now();
+    history.innerHTML += `<div class="copilot-message copilot-bot" id="${loadingId}">Thinking...</div>`;
+    history.scrollTop = history.scrollHeight;
+
+    fetch(`/candidate/${currentCandidateId}/chat`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ question: question })
+    })
+    .then(res => res.json())
+    .then(data => {
+        const loadingEl = document.getElementById(loadingId);
+        if (loadingEl) loadingEl.innerText = data.answer || "No response received.";
+        history.scrollTop = history.scrollHeight;
+    })
+    .catch(err => {
+        const loadingEl = document.getElementById(loadingId);
+        if (loadingEl) loadingEl.innerText = `Error: ${err.message}`;
+    });
+}
+
+function renderModalEmail() {
+    document.getElementById('modalBody').innerHTML = `
+        <div class="email-gen-container">
+            <div class="email-type-selector">
+                <button type="button" class="btn btn-sm btn-primary" onclick="loadEmailDraft('outreach')">Interview Invitation</button>
+                <button type="button" class="btn btn-sm btn-secondary" onclick="loadEmailDraft('feedback')">Constructive Feedback</button>
+            </div>
+            <div class="email-draft-box" id="emailDraftBox">
+                <div class="modal-loading">Generating personalized email draft...</div>
+            </div>
+        </div>
+    `;
+    loadEmailDraft('outreach');
+}
+
+function loadEmailDraft(emailType) {
+    const draftBox = document.getElementById('emailDraftBox');
+    draftBox.innerHTML = '<div class="modal-loading">Generating personalized email draft...</div>';
+
+    fetch(`/candidate/${currentCandidateId}/email?type=${emailType}`)
+        .then(res => res.json())
+        .then(data => {
+            draftBox.innerHTML = `
+                <div class="form-group mb-3">
+                    <label class="form-label">Recipient:</label>
+                    <input type="text" class="form-control" readonly value="${data.recipient || 'candidate@example.com'}">
+                </div>
+                <div class="form-group mb-3">
+                    <label class="form-label">Subject:</label>
+                    <input type="text" class="form-control" id="emailSubject" value="${data.subject}">
+                </div>
+                <div class="form-group mb-3">
+                    <label class="form-label">Body:</label>
+                    <textarea class="form-control" id="emailBody" rows="10">${data.body}</textarea>
+                </div>
+                <div class="form-actions" style="gap: 0.5rem;">
+                    <button type="button" class="btn btn-secondary btn-sm" onclick="navigator.clipboard.writeText(document.getElementById('emailBody').value).then(() => alert('Copied!'))">📋 Copy</button>
+                    <a href="mailto:${data.recipient}?subject=${encodeURIComponent(data.subject)}&body=${encodeURIComponent(data.body)}" class="btn btn-primary btn-sm">✉️ Open in Mail Client</a>
+                </div>
+            `;
+        })
+        .catch(err => {
+            draftBox.innerHTML = `<p class="text-danger">Failed to generate email: ${err.message}</p>`;
+        });
+}
+
+function closeModal(modalId) {
+    document.getElementById(modalId).style.display = 'none';
+}
+
+function selectMobileStage(stageKey) {
+    document.querySelectorAll('.stage-tab-btn').forEach(btn => {
+        btn.classList.toggle('active', btn.getAttribute('data-stage') === stageKey);
+    });
+    const cols = document.querySelectorAll('.kanban-column');
+    if (stageKey === 'all') {
+        cols.forEach(col => { col.style.display = ''; });
+    } else {
+        cols.forEach(col => {
+            const match = col.getAttribute('data-stage') === stageKey;
+            col.style.display = match ? '' : 'none';
+        });
+        const targetCol = document.querySelector(`.kanban-column[data-stage="${stageKey}"]`);
+        if (targetCol) {
+            targetCol.scrollIntoView({ behavior: 'smooth', block: 'nearest', inline: 'center' });
+        }
+    }
+}
+
+window.onclick = function(event) {
+    const modal = document.getElementById('candidateModal');
+    if (event.target === modal) closeModal('candidateModal');
+};
+</script>
+{% endblock %}
