@@ -1,0 +1,161 @@
+{% extends "base.html" %}
+
+{% block title %}Talent Pool Analytics & Insights &bull; AI Screening ATS{% endblock %}
+
+{% block content %}
+<div class="pipeline-header">
+    <div>
+        <div class="breadcrumb-trail">
+            <a href="/results">Dashboard</a> &bull; <a href="/pipeline">Pipeline</a> &bull; <span>Talent Analytics</span>
+        </div>
+        <h1>Talent Pool Analytics & Market Intelligence</h1>
+        <p>Comprehensive aggregate insights into applicant scores, skill distributions, hiring funnel conversion, and candidate integrity health.</p>
+    </div>
+    <div class="dashboard-actions">
+        <a href="/pipeline" class="btn btn-secondary">
+            <svg width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M9 17V7m0 10a2 2 0 01-2 2H5a2 2 0 01-2-2V7a2 2 0 012-2h2a2 2 0 012 2m0 10a2 2 0 002 2h2a2 2 0 002-2M9 7a2 2 0 012-2h2a2 2 0 012 2m0 10V7m0 10a2 2 0 002 2h2a2 2 0 002-2V7a2 2 0 00-2-2h-2a2 2 0 00-2 2"></path></svg>
+            Kanban Pipeline
+        </a>
+        <a href="/results" class="btn btn-outline">
+            <svg width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M4 6h16M4 10h16M4 14h16M4 18h16"></path></svg>
+            Table View
+        </a>
+        <a href="/matrix" class="btn btn-outline">
+            <svg width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M4 6h16M4 10h16M4 14h16M4 18h16"></path></svg>
+            Skill Matrix
+        </a>
+    </div>
+</div>
+
+<!-- High-Level KPI Summary Grid -->
+<div class="stats-overview-grid mb-4">
+    <div class="stat-card">
+        <div class="stat-icon-wrapper blue">👥</div>
+        <div class="stat-info">
+            <span class="stat-value">{{ total_candidates }}</span>
+            <span class="stat-label">Total Applicant Pool</span>
+        </div>
+    </div>
+    <div class="stat-card">
+        <div class="stat-icon-wrapper purple">🎯</div>
+        <div class="stat-info">
+            <span class="stat-value">{{ "%.1f"|format(mean_score) }}</span>
+            <span class="stat-label">Average Fit Score</span>
+        </div>
+    </div>
+    <div class="stat-card">
+        <div class="stat-icon-wrapper green">⭐</div>
+        <div class="stat-info">
+            <span class="stat-value">{{ "%.0f"|format(shortlist_rate) }}%</span>
+            <span class="stat-label">Shortlist Conversion</span>
+        </div>
+    </div>
+    <div class="stat-card">
+        <div class="stat-icon-wrapper amber">🛡️</div>
+        <div class="stat-info">
+            <span class="stat-value">{{ "%.0f"|format(high_integrity_rate) }}%</span>
+            <span class="stat-label">High Integrity (>80%)</span>
+        </div>
+    </div>
+</div>
+
+<!-- Main Analytics Visualizations Grid -->
+<div class="analytics-grid">
+    <!-- Chart 1: Candidate Score Distribution -->
+    <div class="analytics-card">
+        <div class="analytics-card-header">
+            <h3>📊 Candidate Fit Score Distribution</h3>
+            <span class="analytics-tag">Histogram</span>
+        </div>
+        <p class="text-muted mb-3">Breakdown of applicant suitability scores across standard scoring bands.</p>
+        
+        <div class="score-distribution-bars">
+            {% for bucket in score_buckets %}
+            <div class="dist-row">
+                <div class="dist-label-col">
+                    <span class="dist-label">{{ bucket.label }}</span>
+                    <span class="dist-count">{{ bucket.count }} ({{ bucket.pct }}%)</span>
+                </div>
+                <div class="dist-bar-track">
+                    <div class="dist-bar-fill fill-{{ bucket.color }}" style="width: {{ bucket.pct }}%;"></div>
+                </div>
+            </div>
+            {% endfor %}
+        </div>
+    </div>
+
+    <!-- Chart 2: ATS Hiring Stage Funnel -->
+    <div class="analytics-card">
+        <div class="analytics-card-header">
+            <h3>📈 ATS Pipeline Stage Funnel</h3>
+            <span class="analytics-tag">Recruitment Funnel</span>
+        </div>
+        <p class="text-muted mb-3">Live distribution of candidates through each step of the ATS interview pipeline.</p>
+
+        <div class="funnel-container">
+            {% for stage in funnel_stages %}
+            <div class="funnel-step">
+                <div class="funnel-step-header">
+                    <span>{{ stage.icon }} {{ stage.name }}</span>
+                    <strong>{{ stage.count }} candidates</strong>
+                </div>
+                <div class="funnel-bar-track">
+                    <div class="funnel-bar-fill fill-{{ stage.color }}" style="width: {{ stage.pct }}%;"></div>
+                </div>
+            </div>
+            {% endfor %}
+        </div>
+    </div>
+
+    <!-- Chart 3: Skills Frequency in Talent Pool -->
+    <div class="analytics-card">
+        <div class="analytics-card-header">
+            <h3>⚡ Most Prevalent Candidate Skills</h3>
+            <span class="analytics-tag">Top 10 Competencies</span>
+        </div>
+        <p class="text-muted mb-3">Frequency and pool coverage of primary skills detected in candidate resumes.</p>
+
+        <div class="skills-freq-list">
+            {% for s in top_skills_data %}
+            <div class="skill-freq-item">
+                <div class="skill-freq-meta">
+                    <span class="skill-freq-name">{{ s.name }}</span>
+                    <span class="skill-freq-count">{{ s.count }} candidates ({{ s.pct }}%)</span>
+                </div>
+                <div class="skill-freq-track">
+                    <div class="skill-freq-fill" style="width: {{ s.pct }}%;"></div>
+                </div>
+            </div>
+            {% endfor %}
+        </div>
+    </div>
+
+    <!-- Chart 4: Experience & Seniority Breakdown -->
+    <div class="analytics-card">
+        <div class="analytics-card-header">
+            <h3>⏳ Seniority & Experience Distribution</h3>
+            <span class="analytics-tag">Years of Experience</span>
+        </div>
+        <p class="text-muted mb-3">Talent density categorized by professional experience tiers.</p>
+
+        <div class="seniority-grid">
+            {% for exp in exp_buckets %}
+            <div class="seniority-card">
+                <div class="seniority-icon">{{ exp.icon }}</div>
+                <h4>{{ exp.label }}</h4>
+                <div class="seniority-number">{{ exp.count }}</div>
+                <span class="seniority-pct">{{ exp.pct }}% of pool</span>
+            </div>
+            {% endfor %}
+        </div>
+    </div>
+</div>
+
+<div class="analytics-footer-banner mt-4">
+    <div class="banner-icon">💡</div>
+    <div class="banner-text">
+        <h4>Talent Acquisition Recommendation</h4>
+        <p>Your candidate pool demonstrates high density in <strong>{{ top_skills_data[0].name if top_skills_data else 'Python' }}</strong> and <strong>{{ top_skills_data[1].name if top_skills_data|length > 1 else 'SQL' }}</strong>. To maximize engineering velocity, prioritize candidates advancing through the <strong>Tech Interview</strong> stage with an Integrity Rating above 80%.</p>
+    </div>
+</div>
+{% endblock %}
