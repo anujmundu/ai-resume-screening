@@ -1,0 +1,89 @@
+{% extends "base.html" %}
+
+{% block title %}Skill Gap Matrix &bull; Talent Alignment Heatmap{% endblock %}
+
+{% block content %}
+<div class="dashboard-header">
+    <div>
+        <h1>Skill Gap & Role Alignment Matrix</h1>
+        <p>Cross-candidate competency heatmap and technical coverage analysis.</p>
+    </div>
+    <div class="dashboard-actions">
+        <a href="/results" class="btn btn-outline">
+            <svg width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M4 6h16M4 10h16M4 14h16M4 18h16"></path></svg>
+            Candidate Table
+        </a>
+        <a href="/upload-resume" class="btn btn-primary">
+            <svg width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M12 4v16m8-8H4"></path></svg>
+            Screen New Resumes
+        </a>
+    </div>
+</div>
+
+<div class="matrix-overview-card">
+    <div class="matrix-legend">
+        <span class="legend-title">Legend:</span>
+        <span class="legend-item"><span class="legend-badge cell-match">✓</span> Verified in Resume</span>
+        <span class="legend-item"><span class="legend-badge cell-missing">✗</span> Missing / Gap</span>
+    </div>
+    <div class="matrix-info">
+        <span>Evaluated Candidates: <strong>{{ candidates|length }}</strong></span>
+        <span>Tracked Competencies: <strong>{{ all_skills|length }}</strong></span>
+    </div>
+</div>
+
+<div class="mobile-table-hint">
+    <span>👉 Swipe horizontally across competencies &bull; Candidate column is pinned</span>
+</div>
+
+<div class="table-container matrix-container">
+    <table class="data-table matrix-table">
+        <thead>
+            <tr>
+                <th class="sticky-col">Candidate</th>
+                <th>Score</th>
+                <th>Role Coverage</th>
+                {% for skill in all_skills %}
+                    <th class="skill-col-header">{{ skill }}</th>
+                {% endfor %}
+            </tr>
+        </thead>
+        <tbody>
+            {% for c in candidates %}
+            {% set d = c.data %}
+            {% set c_skills_lower = d.skills|map('lower')|list %}
+            <tr>
+                <td class="sticky-col candidate-cell">
+                    <strong>{{ d.candidate_name or "Candidate" }}</strong>
+                    <span class="date-sub">{{ d.experience_years }} yrs &bull; {{ d.education or "Degree" }}</span>
+                </td>
+                <td>
+                    <div class="score-pill score-pill-{{ c.decision }}">
+                        <strong>{{ c.score }}</strong>
+                    </div>
+                </td>
+                <td>
+                    <div class="coverage-bar-wrap">
+                        <div class="coverage-bar" style="width: {{ c.coverage_pct }}%;"></div>
+                        <span class="coverage-text">{{ "%.0f"|format(c.coverage_pct) }}%</span>
+                    </div>
+                </td>
+                {% for skill in all_skills %}
+                    {% if skill.lower() in c_skills_lower %}
+                        <td class="matrix-cell cell-match" title="{{ d.candidate_name }} has {{ skill }}">✓</td>
+                    {% else %}
+                        <td class="matrix-cell cell-missing" title="{{ d.candidate_name }} is missing {{ skill }}">—</td>
+                    {% endif %}
+                {% endfor %}
+            </tr>
+            {% else %}
+            <tr>
+                <td colspan="{{ all_skills|length + 3 }}" class="empty-state">
+                    <p>No candidates available in the matrix. Screen resumes to populate.</p>
+                </td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</div>
+{% endblock %}
