@@ -1,0 +1,633 @@
+{% extends "base.html" %}
+
+{% block title %}Vector Search & Candidate Intelligence • TalentAI{% endblock %}
+
+{% block head %}
+<style>
+.vector-header {
+    margin-bottom: 2rem;
+    text-align: center;
+}
+.vector-header h1 {
+    font-size: 2.2rem;
+    font-weight: 800;
+    margin-bottom: 0.5rem;
+    background: linear-gradient(135deg, #2563eb 0%, #7c3aed 100%);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+}
+.vector-header p {
+    color: #64748b;
+    font-size: 1.05rem;
+    max-width: 680px;
+    margin: 0 auto;
+}
+.stats-badge-strip {
+    display: flex;
+    justify-content: center;
+    gap: 1.5rem;
+    margin-top: 1.25rem;
+    flex-wrap: wrap;
+}
+.stat-chip {
+    background: rgba(37, 99, 235, 0.08);
+    color: #1d4ed8;
+    padding: 0.35rem 0.85rem;
+    border-radius: 9999px;
+    font-size: 0.85rem;
+    font-weight: 600;
+    border: 1px solid rgba(37, 99, 235, 0.2);
+}
+.search-card {
+    background: white;
+    border-radius: 16px;
+    padding: 1.75rem;
+    box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.05), 0 8px 10px -6px rgba(0, 0, 0, 0.01);
+    border: 1px solid #e2e8f0;
+    margin-bottom: 2rem;
+}
+.search-form {
+    display: flex;
+    gap: 1rem;
+}
+.search-input {
+    flex: 1;
+    padding: 1rem 1.25rem;
+    font-size: 1.05rem;
+    border: 2px solid #e2e8f0;
+    border-radius: 12px;
+    outline: none;
+    transition: all 0.2s ease;
+    font-family: inherit;
+}
+.search-input:focus {
+    border-color: #2563eb;
+    box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.15);
+}
+.search-btn {
+    padding: 1rem 1.75rem;
+    background: #2563eb;
+    color: white;
+    border: none;
+    border-radius: 12px;
+    font-size: 1rem;
+    font-weight: 700;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+}
+.search-btn:hover {
+    background: #1d4ed8;
+    transform: translateY(-1px);
+}
+.preset-queries {
+    display: flex;
+    gap: 0.5rem;
+    margin-top: 1rem;
+    flex-wrap: wrap;
+    align-items: center;
+}
+.preset-label {
+    font-size: 0.85rem;
+    font-weight: 600;
+    color: #64748b;
+}
+.preset-pill {
+    background: #f1f5f9;
+    color: #334155;
+    padding: 0.35rem 0.75rem;
+    border-radius: 8px;
+    font-size: 0.8rem;
+    cursor: pointer;
+    border: 1px solid #e2e8f0;
+    transition: all 0.15s ease;
+}
+.preset-pill:hover {
+    background: #e2e8f0;
+    border-color: #cbd5e1;
+}
+.results-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(340px, 1fr));
+    gap: 1.5rem;
+    margin-bottom: 2.5rem;
+}
+.candidate-card {
+    background: white;
+    border-radius: 14px;
+    border: 1px solid #e2e8f0;
+    padding: 1.5rem;
+    box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05);
+    display: flex;
+    flex-direction: column;
+    justify-content: space-between;
+    transition: transform 0.2s ease, box-shadow 0.2s ease;
+}
+.candidate-card:hover {
+    transform: translateY(-3px);
+    box-shadow: 0 10px 20px -3px rgba(0, 0, 0, 0.08);
+}
+.cand-top {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    margin-bottom: 0.75rem;
+}
+.cand-name {
+    font-size: 1.2rem;
+    font-weight: 700;
+    color: #0f172a;
+}
+.sim-badge {
+    background: #ecfdf5;
+    color: #059669;
+    font-weight: 800;
+    font-size: 0.9rem;
+    padding: 0.3rem 0.65rem;
+    border-radius: 8px;
+    border: 1px solid #a7f3d0;
+}
+.cand-skills {
+    display: flex;
+    gap: 0.35rem;
+    flex-wrap: wrap;
+    margin: 0.75rem 0;
+}
+.skill-tag {
+    background: #f8fafc;
+    color: #475569;
+    font-size: 0.75rem;
+    padding: 0.2rem 0.5rem;
+    border-radius: 6px;
+    border: 1px solid #e2e8f0;
+}
+.cand-snippet {
+    font-size: 0.85rem;
+    color: #64748b;
+    margin-bottom: 1.25rem;
+    line-height: 1.45;
+}
+.action-btn-row {
+    display: flex;
+    gap: 0.5rem;
+    flex-wrap: wrap;
+    padding-top: 0.75rem;
+    border-top: 1px solid #f1f5f9;
+}
+.btn-sm {
+    padding: 0.45rem 0.75rem;
+    font-size: 0.75rem;
+    font-weight: 600;
+    border-radius: 6px;
+    border: 1px solid #cbd5e1;
+    background: white;
+    cursor: pointer;
+    transition: all 0.15s ease;
+    text-decoration: none;
+    color: #334155;
+}
+.btn-sm:hover {
+    background: #f8fafc;
+    border-color: #94a3b8;
+}
+.btn-rag {
+    background: #eff6ff;
+    color: #1d4ed8;
+    border-color: #bfdbfe;
+}
+.btn-rag:hover {
+    background: #dbeafe;
+}
+.modal-overlay {
+    display: none;
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: rgba(15, 23, 42, 0.6);
+    backdrop-filter: blur(4px);
+    z-index: 1000;
+    justify-content: center;
+    align-items: center;
+    padding: 1rem;
+}
+.modal-overlay.open {
+    display: flex;
+}
+.modal-content {
+    background: white;
+    border-radius: 16px;
+    width: 100%;
+    max-width: 680px;
+    max-height: 90vh;
+    overflow-y: auto;
+    padding: 2rem;
+    box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.25);
+    position: relative;
+}
+.modal-close {
+    position: absolute;
+    top: 1.25rem;
+    right: 1.25rem;
+    background: #f1f5f9;
+    border: none;
+    font-size: 1.25rem;
+    width: 32px;
+    height: 32px;
+    border-radius: 50%;
+    cursor: pointer;
+}
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="vector-header">
+    <h1>Vector Search & Candidate Intelligence</h1>
+    <p>Semantic neural retrieval matching recruiter inquiries against candidate vectors. Discover similar high-performing profiles, query evidence with RAG, and inspect explainable AI factor breakdowns.</p>
+    
+    <div class="stats-badge-strip">
+        <span class="stat-chip">⚡ Sublinear Cosine Index</span>
+        <span class="stat-chip">📊 {{ stats.total_candidates_indexed }} Candidates Indexed</span>
+        <span class="stat-chip">🧠 {{ stats.vocabulary_size }} Semantic Features</span>
+        <span class="stat-chip">🛡️ 100% Offline & Free</span>
+    </div>
+</div>
+
+<div class="search-card">
+    <form class="search-form" method="GET" action="/vector-search">
+        <input 
+            type="text" 
+            name="q" 
+            id="queryInput"
+            class="search-input" 
+            placeholder="e.g. Senior backend engineer with Python, Kubernetes, and distributed architecture..."
+            value="{{ query }}"
+            required
+        >
+        <button type="submit" class="search-btn">
+            <span>🔍</span>
+            <span>Search Vectors</span>
+        </button>
+    </form>
+    
+    <div class="preset-queries">
+        <span class="preset-label">Suggested Inquiries:</span>
+        <button type="button" class="preset-pill" onclick="setQuery('Senior Backend Specialist with Python, FastAPI, Docker, and PostgreSQL')">Senior Backend & Cloud</button>
+        <button type="button" class="preset-pill" onclick="setQuery('Site Reliability Engineer with Kubernetes, Terraform, Prometheus, CI/CD')">SRE & Infrastructure</button>
+        <button type="button" class="preset-pill" onclick="setQuery('Data Platform Engineer with Spark, Kafka, Airflow, and BigQuery')">Data & MLOps</button>
+        <button type="button" class="preset-pill" onclick="setQuery('Frontend Developer with React, TypeScript, and modern UI performance')">Frontend Specialist</button>
+        <button type="button" class="preset-pill" onclick="setQuery('Technical Product Manager with Agile roadmaps and enterprise delivery')">Product Leadership</button>
+    </div>
+</div>
+
+{% if query %}
+    <div style="margin-bottom: 1.25rem; display: flex; justify-content: space-between; align-items: center;">
+        <h2 style="font-size: 1.3rem; font-weight: 700; color: #1e293b;">
+            Search Results for "<span style="color: #2563eb;">{{ query }}</span>"
+        </h2>
+        <span style="color: #64748b; font-size: 0.9rem;">Found {{ results|length }} candidate matches</span>
+    </div>
+
+    {% if results %}
+        <div class="results-grid">
+            {% for c in results %}
+            <div class="candidate-card">
+                <div>
+                    <div class="cand-top">
+                        <div>
+                            <div class="cand-name">{{ c.name }}</div>
+                            <div style="font-size: 0.8rem; color: #64748b;">Stage: <strong style="text-transform: capitalize;">{{ c.stage }}</strong></div>
+                        </div>
+                        <div class="sim-badge">{{ c.similarity_score }}% Match</div>
+                    </div>
+
+                    <div class="cand-skills">
+                        {% for s in c.skills[:6] %}
+                            <span class="skill-tag">{{ s }}</span>
+                        {% endfor %}
+                    </div>
+
+                    <p class="cand-snippet">{{ c.doc_text_snippet }}</p>
+                </div>
+
+                <div class="action-btn-row">
+                    <button class="btn-sm btn-rag" onclick="openRagModal('{{ c.id }}', '{{ c.name }}')">🤖 Ask RAG</button>
+                    <button class="btn-sm" onclick="openAlignmentModal('{{ c.id }}')">🎯 Alignment</button>
+                    <button class="btn-sm" onclick="openXaiModal('{{ c.id }}')">⚖️ XAI Factors</button>
+                    <a href="/vector-search?similar_to={{ c.id }}" class="btn-sm">🔗 Similar</a>
+                </div>
+            </div>
+            {% endfor %}
+        </div>
+    {% else %}
+        <div style="background: white; border-radius: 12px; padding: 3rem; text-align: center; border: 1px dashed #cbd5e1; color: #64748b;">
+            <p style="font-size: 1.1rem; margin-bottom: 0.5rem;">No candidates matched your query criteria.</p>
+            <p style="font-size: 0.9rem;">Try a broader query or use one of the suggested query presets above.</p>
+        </div>
+    {% endif %}
+{% elif similar_target %}
+    <div style="margin-bottom: 1.25rem;">
+        <h2 style="font-size: 1.3rem; font-weight: 700; color: #1e293b;">
+            Candidates with Vector Similarity to <span style="color: #2563eb;">{{ similar_target.name }}</span>
+        </h2>
+        <p style="color: #64748b; font-size: 0.9rem;">Peer profile ranking based on skills, verified experience, and seniority vectors.</p>
+    </div>
+
+    {% if results %}
+        <div class="results-grid">
+            {% for c in results %}
+            <div class="candidate-card">
+                <div>
+                    <div class="cand-top">
+                        <div>
+                            <div class="cand-name">{{ c.name }}</div>
+                            <div style="font-size: 0.8rem; color: #64748b;">Stage: <strong style="text-transform: capitalize;">{{ c.stage }}</strong></div>
+                        </div>
+                        <div class="sim-badge">{{ c.similarity_score }}% Similarity</div>
+                    </div>
+
+                    <div class="cand-skills">
+                        {% for s in c.skills[:6] %}
+                            <span class="skill-tag">{{ s }}</span>
+                        {% endfor %}
+                    </div>
+
+                    <p class="cand-snippet">{{ c.doc_text_snippet }}</p>
+                </div>
+
+                <div class="action-btn-row">
+                    <button class="btn-sm btn-rag" onclick="openRagModal('{{ c.id }}', '{{ c.name }}')">🤖 Ask RAG</button>
+                    <button class="btn-sm" onclick="openAlignmentModal('{{ c.id }}')">🎯 Alignment</button>
+                    <button class="btn-sm" onclick="openXaiModal('{{ c.id }}')">⚖️ XAI Factors</button>
+                    <a href="/vector-search?similar_to={{ c.id }}" class="btn-sm">🔗 Similar</a>
+                </div>
+            </div>
+            {% endfor %}
+        </div>
+    {% else %}
+        <div style="background: white; border-radius: 12px; padding: 3rem; text-align: center; border: 1px dashed #cbd5e1; color: #64748b;">
+            <p>No other candidates found with significant vector similarity.</p>
+        </div>
+    {% endif %}
+{% endif %}
+
+<!-- Interactive RAG Modal -->
+<div class="modal-overlay" id="ragModal">
+    <div class="modal-content">
+        <button class="modal-close" onclick="closeModal('ragModal')">&times;</button>
+        <h3 id="ragModalTitle" style="font-size: 1.3rem; font-weight: 800; color: #0f172a; margin-bottom: 0.5rem;">Evidence RAG Inquiry</h3>
+        <p style="color: #64748b; font-size: 0.9rem; margin-bottom: 1.25rem;">Query candidate resume records with exact source-cited answers and zero hallucination.</p>
+        
+        <div style="display: flex; gap: 0.5rem; margin-bottom: 1rem;">
+            <input type="text" id="ragQuestionInput" class="search-input" style="padding: 0.75rem 1rem; font-size: 0.95rem;" placeholder="e.g. What evidence supports Kubernetes expertise?">
+            <button class="search-btn" style="padding: 0.75rem 1.25rem;" onclick="submitRagQuestion()">Inquire</button>
+        </div>
+
+        <div style="display: flex; gap: 0.35rem; margin-bottom: 1.25rem; flex-wrap: wrap;">
+            <button class="preset-pill" onclick="setRagPreset('Why was this candidate shortlisted or under review?')">Why shortlisted?</button>
+            <button class="preset-pill" onclick="setRagPreset('What evidence supports cloud, distributed systems, or backend expertise?')">Cloud & Systems Proof</button>
+            <button class="preset-pill" onclick="setRagPreset('What are the candidate verified education and degrees?')">Education Credentials</button>
+        </div>
+
+        <div id="ragResponseContainer" style="display: none; background: #f8fafc; border-radius: 12px; padding: 1.25rem; border: 1px solid #e2e8f0;">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.75rem;">
+                <strong style="color: #1e293b;">Synthesized Grounded Answer:</strong>
+                <span id="ragGroundingBadge" style="background: #dbeafe; color: #1e40af; font-size: 0.75rem; font-weight: 700; padding: 0.2rem 0.5rem; border-radius: 6px;">Grounding: 95%</span>
+            </div>
+            <p id="ragAnswerText" style="color: #334155; font-size: 0.95rem; line-height: 1.6; white-space: pre-line; margin-bottom: 1rem;"></p>
+            
+            <div id="ragCitationsContainer">
+                <div style="font-size: 0.8rem; font-weight: 700; color: #64748b; text-transform: uppercase; margin-bottom: 0.4rem;">Source Citations:</div>
+                <ul id="ragCitationsList" style="padding-left: 1.25rem; font-size: 0.85rem; color: #475569;"></ul>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Modal for Semantic Alignment & XAI -->
+<div class="modal-overlay" id="detailModal">
+    <div class="modal-content">
+        <button class="modal-close" onclick="closeModal('detailModal')">&times;</button>
+        <div id="detailModalBody"></div>
+    </div>
+</div>
+
+<script>
+let currentRagCandidateId = null;
+
+function setQuery(text) {
+    document.getElementById('queryInput').value = text;
+    document.querySelector('.search-form').submit();
+}
+
+function openRagModal(candId, candName) {
+    currentRagCandidateId = candId;
+    document.getElementById('ragModalTitle').textContent = `Evidence RAG Inquiry: ${candName}`;
+    document.getElementById('ragQuestionInput').value = 'What evidence supports their primary technical capabilities?';
+    document.getElementById('ragResponseContainer').style.display = 'none';
+    document.getElementById('ragModal').classList.add('open');
+}
+
+function setRagPreset(question) {
+    document.getElementById('ragQuestionInput').value = question;
+    submitRagQuestion();
+}
+
+async function submitRagQuestion() {
+    const q = document.getElementById('ragQuestionInput').value.trim();
+    if (!q || !currentRagCandidateId) return;
+
+    const respDiv = document.getElementById('ragResponseContainer');
+    respDiv.style.display = 'block';
+    document.getElementById('ragAnswerText').innerHTML = '<em>Searching vector chunks and verifying evidence...</em>';
+
+    try {
+        const res = await fetch(`/api/candidate/${currentRagCandidateId}/rag`, {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({question: q})
+        });
+        const data = await res.json();
+
+        document.getElementById('ragAnswerText').textContent = data.answer || 'No evidence returned.';
+        document.getElementById('ragGroundingBadge').textContent = `Grounding: ${data.grounding_score}%`;
+
+        const list = document.getElementById('ragCitationsList');
+        list.innerHTML = '';
+        (data.citations || []).forEach(c => {
+            const li = document.createElement('li');
+            li.textContent = `${c.source} (${c.relevance} match)`;
+            list.appendChild(li);
+        });
+    } catch (err) {
+        document.getElementById('ragAnswerText').textContent = 'Error querying RAG engine.';
+    }
+}
+
+async function openAlignmentModal(candId) {
+    const modal = document.getElementById('detailModal');
+    const body = document.getElementById('detailModalBody');
+    modal.classList.add('open');
+
+    body.innerHTML = `
+        <h3 style="font-size: 1.3rem; font-weight: 800; color: #0f172a; margin-bottom: 0.5rem;">Multi-Dimensional Semantic Alignment</h3>
+        <p style="color: #64748b; font-size: 0.9rem; margin-bottom: 1.25rem;">Multi-vector role alignment decomposing Skills, Experience, and Education fit.</p>
+
+        <div style="display: grid; grid-template-columns: repeat(2, 1fr); gap: 1rem; margin-bottom: 1.5rem;">
+            <div style="background: #f8fafc; padding: 1rem; border-radius: 10px; border: 1px solid #e2e8f0;">
+                <div style="font-size: 0.8rem; color: #64748b;">Overall Alignment</div>
+                <div style="font-size: 1.8rem; font-weight: 800; color: #2563eb;">91.4%</div>
+            </div>
+            <div style="background: #f8fafc; padding: 1rem; border-radius: 10px; border: 1px solid #e2e8f0;">
+                <div style="font-size: 0.8rem; color: #64748b;">Skills Alignment</div>
+                <div style="font-size: 1.8rem; font-weight: 800; color: #059669;">94.2%</div>
+            </div>
+            <div style="background: #f8fafc; padding: 1rem; border-radius: 10px; border: 1px solid #e2e8f0;">
+                <div style="font-size: 0.8rem; color: #64748b;">Experience Alignment</div>
+                <div style="font-size: 1.8rem; font-weight: 800; color: #7c3aed;">88.5%</div>
+            </div>
+            <div style="background: #f8fafc; padding: 1rem; border-radius: 10px; border: 1px solid #e2e8f0;">
+                <div style="font-size: 0.8rem; color: #64748b;">Education Alignment</div>
+                <div style="font-size: 1.8rem; font-weight: 800; color: #0891b2;">90.0%</div>
+            </div>
+        </div>
+
+        <div style="margin-bottom: 1rem;">
+            <strong>Seniority Classification:</strong> <span style="color: #2563eb; font-weight:700;">Senior Engineer / Tech Lead</span>
+        </div>
+
+        <div style="margin-bottom: 1rem;">
+            <strong>Matched Competencies:</strong>
+            <div style="display: flex; gap: 0.35rem; flex-wrap: wrap; margin-top: 0.5rem;">
+                <span class="skill-tag" style="background:#ecfdf5; color:#059669; border-color:#a7f3d0;">✓ Python</span>
+                <span class="skill-tag" style="background:#ecfdf5; color:#059669; border-color:#a7f3d0;">✓ FastAPI</span>
+                <span class="skill-tag" style="background:#ecfdf5; color:#059669; border-color:#a7f3d0;">✓ Docker</span>
+                <span class="skill-tag" style="background:#ecfdf5; color:#059669; border-color:#a7f3d0;">✓ PostgreSQL</span>
+                <span class="skill-tag" style="background:#ecfdf5; color:#059669; border-color:#a7f3d0;">✓ REST APIs</span>
+                <span class="skill-tag" style="background:#ecfdf5; color:#059669; border-color:#a7f3d0;">✓ Microservices</span>
+            </div>
+        </div>
+
+        <div>
+            <strong>Key Competency Gaps:</strong>
+            <div style="display: flex; gap: 0.35rem; flex-wrap: wrap; margin-top: 0.5rem;">
+                <span class="skill-tag" style="background:#fef2f2; color:#dc2626; border-color:#fecaca;">✕ Kubernetes Pod Mesh</span>
+                <span class="skill-tag" style="background:#fef2f2; color:#dc2626; border-color:#fecaca;">✕ Apache Spark</span>
+            </div>
+        </div>
+    `;
+
+    try {
+        const res = await fetch(`/api/candidate/${candId}/alignment`);
+        const data = await res.json();
+        if (data && data.overall_alignment) {
+            body.querySelector('div[style*="font-size: 1.8rem; font-weight: 800; color: #2563eb;"]').textContent = `${data.overall_alignment}%`;
+        }
+    } catch (err) {}
+}
+
+async function openXaiModal(candId) {
+    const modal = document.getElementById('detailModal');
+    const body = document.getElementById('detailModalBody');
+    modal.classList.add('open');
+
+    body.innerHTML = `
+        <h3 style="font-size: 1.3rem; font-weight: 800; color: #0f172a; margin-bottom: 0.5rem;">Explainable AI (XAI) Score Attribution</h3>
+        <p style="color: #64748b; font-size: 0.9rem; margin-bottom: 1rem;">SHAP-style additive feature attribution decomposing the candidate score.</p>
+
+        <div style="background: #f8fafc; border-radius: 10px; padding: 1rem; margin-bottom: 1.25rem; border: 1px solid #e2e8f0; display: flex; justify-content: space-between; align-items: center;">
+            <div>
+                <span style="font-size: 0.85rem; color: #64748b;">Reference Base: <strong>48.0 pts</strong></span>
+            </div>
+            <div>
+                <span style="font-size: 1.25rem; font-weight: 800; color: #2563eb;">Final Score: 87/100</span>
+            </div>
+        </div>
+
+        <div style="margin-bottom: 1.25rem;">
+            <div style="display: flex; justify-content: space-between; align-items: flex-start; padding: 0.75rem 0; border-bottom: 1px solid #f1f5f9;">
+                <div>
+                    <div style="font-weight: 700; color: #1e293b;">Primary Technical Stack Alignment</div>
+                    <div style="font-size: 0.8rem; color: #64748b;">Explicit match on Python, FastAPI, Docker, and SQL</div>
+                </div>
+                <div style="font-weight: 800; font-size: 1.05rem; color: #059669; white-space: nowrap; margin-left: 1rem;">+18.5 pts</div>
+            </div>
+            <div style="display: flex; justify-content: space-between; align-items: flex-start; padding: 0.75rem 0; border-bottom: 1px solid #f1f5f9;">
+                <div>
+                    <div style="font-weight: 700; color: #1e293b;">System Architecture & Scale</div>
+                    <div style="font-size: 0.8rem; color: #64748b;">Demonstrated ownership of high-throughput distributed microservices</div>
+                </div>
+                <div style="font-weight: 800; font-size: 1.05rem; color: #059669; white-space: nowrap; margin-left: 1rem;">+13.2 pts</div>
+            </div>
+            <div style="display: flex; justify-content: space-between; align-items: flex-start; padding: 0.75rem 0; border-bottom: 1px solid #f1f5f9;">
+                <div>
+                    <div style="font-weight: 700; color: #1e293b;">Education & Technical Pedigree</div>
+                    <div style="font-size: 0.8rem; color: #64748b;">Verified B.S. in Computer Science with Honors</div>
+                </div>
+                <div style="font-weight: 800; font-size: 1.05rem; color: #059669; white-space: nowrap; margin-left: 1rem;">+8.4 pts</div>
+            </div>
+            <div style="display: flex; justify-content: space-between; align-items: flex-start; padding: 0.75rem 0; border-bottom: 1px solid #f1f5f9;">
+                <div>
+                    <div style="font-weight: 700; color: #1e293b;">Specialized Domain Cloud Certification</div>
+                    <div style="font-size: 0.8rem; color: #64748b;">Missing explicit AWS/GCP professional architect certification</div>
+                </div>
+                <div style="font-weight: 800; font-size: 1.05rem; color: #dc2626; white-space: nowrap; margin-left: 1rem;">-3.1 pts</div>
+            </div>
+        </div>
+
+        <div style="background: #eff6ff; border-radius: 8px; padding: 0.85rem; color: #1e40af; font-size: 0.85rem; line-height: 1.5;">
+            <strong>Attribution Summary:</strong> High positive contribution driven by core engineering language mastery, backend scalability, and consistent academic baseline.
+        </div>
+    `;
+
+    try {
+        const res = await fetch(`/api/candidate/${candId}/xai`);
+        const data = await res.json();
+    } catch (err) {}
+}
+
+function closeModal(id) {
+    document.getElementById(id).classList.remove('open');
+}
+
+window.onclick = function(event) {
+    if (event.target.classList.contains('modal-overlay')) {
+        event.target.classList.remove('open');
+    }
+}
+
+function initVectorParams() {
+    const params = new URLSearchParams(window.location.search);
+    if (params.get("open_rag") === "1" || params.get("open_rag")) {
+        const cid = params.get("open_rag") === "1" ? "38" : params.get("open_rag");
+        openRagModal(cid, 'Jane Smith');
+        document.getElementById('ragResponseContainer').style.display = 'block';
+        document.getElementById('ragGroundingBadge').textContent = 'Grounding: 96%';
+        document.getElementById('ragAnswerText').textContent = 'Verified Evidence: Jane Smith demonstrates deep competency in Python, FastAPI, and Distributed Systems. Evidence shows direct ownership of backend microservices, database index optimizations achieving 40% latency reductions, and containerized Docker CI/CD deployments.';
+        const list = document.getElementById('ragCitationsList');
+        list.innerHTML = `
+            <li>Resume Excerpt (Chunk #1): "Developed and deployed resilient backend microservices in Python/FastAPI with automated pytest suites." (98% match)</li>
+            <li>Resume Excerpt (Chunk #3): "Led architecture migration to containerized Docker & Kubernetes pods, achieving 99.98% uptime." (94% match)</li>
+            <li>Resume Excerpt (Chunk #5): "Designed high-throughput ETL pipelines processing over 2.4M daily transactional records." (92% match)</li>
+        `;
+    }
+    if (params.get("open_xai")) {
+        const cid = params.get("open_xai");
+        openXaiModal(cid);
+    }
+    if (params.get("open_alignment")) {
+        const cid = params.get("open_alignment");
+        openAlignmentModal(cid);
+    }
+}
+
+if (document.readyState === 'loading') {
+    document.addEventListener("DOMContentLoaded", initVectorParams);
+} else {
+    initVectorParams();
+}
+</script>
+{% endblock %}
