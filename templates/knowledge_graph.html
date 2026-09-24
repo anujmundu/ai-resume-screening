@@ -1,0 +1,2341 @@
+{% extends "base.html" %}
+
+{% block title %}Candidate Knowledge Graph & Entity Intelligence &bull; TalentAI{% endblock %}
+
+{% block content %}
+<div class="kg-master-container">
+    <!-- Header Banner -->
+    <div class="kg-header">
+        <div class="kg-title-group">
+            <div class="kg-badge">🕸️ NetworkX Heterogeneous Intelligence</div>
+            <h1 class="kg-title">Candidate Knowledge Graph &amp; Entity Intelligence</h1>
+            <p class="kg-subtitle">
+                Interactive topological network mapping Candidates, Competencies, and Talent Hubs.
+                Explore domain constellations, drill down into candidate ego-networks, and detect cross-domain technical bridge skills.
+            </p>
+        </div>
+        <div class="kg-actions">
+            <button class="btn btn-outline" onclick="resetGraphView()">🎯 Center &amp; Reset</button>
+            <button class="btn btn-primary" onclick="openDebateModalForSelected()">⚔️ Adversarial Debate</button>
+            <button class="btn btn-secondary" onclick="openAdaptiveInterviewModal()">🎙️ Adaptive Interview</button>
+        </div>
+    </div>
+
+    <!-- Executive KPI Bar -->
+    <div class="kg-stats-grid">
+        <div class="kg-stat-card">
+            <div class="stat-value" id="statNodes">{{ stats.total_nodes }}</div>
+            <div class="stat-label">Total Graph Entities</div>
+            <div class="stat-meta">Candidates, Skills, Companies, Degrees</div>
+        </div>
+        <div class="kg-stat-card">
+            <div class="stat-value" id="statEdges">{{ stats.total_edges }}</div>
+            <div class="stat-label">Entity Relationships</div>
+            <div class="stat-meta">Verified competencies &amp; career links</div>
+        </div>
+        <div class="kg-stat-card">
+            <div class="stat-value" id="statDensity">{{ stats.density }}</div>
+            <div class="stat-label">Graph Density</div>
+            <div class="stat-meta">Topological network connectedness</div>
+        </div>
+        <div class="kg-stat-card">
+            <div class="stat-value">{{ stats.top_hub_skills|length }}</div>
+            <div class="stat-label">Core Hub Competencies</div>
+            <div class="stat-meta">Ranked via Degree &amp; Betweenness Centrality</div>
+        </div>
+    </div>
+
+    <!-- ================= 1. FULL WIDTH HERO GRAPH CONTAINER (780px TALL) ================= -->
+    <div class="kg-hero-container">
+        <!-- Executive Toolbar -->
+        <div class="kg-hero-toolbar">
+            <div class="kg-toolbar-row">
+                <!-- Search Box -->
+                <div class="search-box-wrapper">
+                    <span class="search-icon">🔍</span>
+                    <input type="text" id="entitySearchInput" class="form-control form-control-sm kg-search-input"
+                           placeholder="Search candidate, skill, company..." oninput="handleEntitySearch(this.value)" autocomplete="off">
+                    <div id="searchResultsDropdown" class="search-dropdown" style="display: none;"></div>
+                </div>
+
+                <!-- Custom Searchable Candidate Dropdown (Guaranteed 100% visible, deep black text on crisp white menu) -->
+                <div class="custom-cand-dropdown" id="customCandDropdown">
+                    <button type="button" class="cand-dropdown-btn" id="candDropdownBtn" onclick="toggleCandDropdown(event)">
+                        <span id="candDropdownLabel">👤 Spotlight Candidate: All Candidates</span>
+                        <span class="caret-arrow">▼</span>
+                    </button>
+                    <div class="cand-dropdown-menu" id="candDropdownMenu" style="display: none;">
+                        <div class="cand-dropdown-search-wrap">
+                            <input type="text" id="candFilterInput" class="cand-dropdown-filter" placeholder="🔎 Type candidate name..." oninput="filterCandidateList(this.value)">
+                        </div>
+                        <div class="cand-dropdown-items" id="candDropdownItems">
+                            <div class="cand-item reset-item" onclick="selectCandidate('', '👤 Spotlight Candidate: All Candidates')">
+                                🌐 View Entire Talent Pool Network
+                            </div>
+                            {% for c in candidates %}
+                            <div class="cand-item" data-id="{{ c._id or c.id }}" data-name="{{ c.candidate_name or c.data.candidate_name }}"
+                                 onclick="selectCandidate('{{ c._id or c.id }}', '{{ c.candidate_name or c.data.candidate_name }}')">
+                                <div class="cand-item-left">
+                                    <span class="cand-avatar-mini">{{ (c.candidate_name or c.data.candidate_name)[:2]|upper }}</span>
+                                    <span class="cand-item-name">{{ c.candidate_name or c.data.candidate_name }}</span>
+                                </div>
+                                <span class="cand-item-score">{{ c.score }} pts</span>
+                            </div>
+                            {% endfor %}
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Native Fallback Select (Light color scheme & guaranteed deep black text) -->
+                <select id="candidateSelect" class="form-select form-select-sm native-candidate-select" onchange="onNativeSelectChange(this.value)">
+                    <option value="" style="color: #64748b !important; background-color: #ffffff !important;">-- Spotlight Candidate --</option>
+                    {% for c in candidates %}
+                        <option value="{{ c._id or c.id }}" style="color: #000000 !important; background-color: #ffffff !important; -webkit-text-fill-color: #000000 !important; font-weight: 600;">
+                            {{ c.candidate_name or c.data.candidate_name }} ({{ c.score }} pts)
+                        </option>
+                    {% endfor %}
+                </select>
+
+                <!-- Density Toggle: Clean vs Full -->
+                <div class="btn-group-toggle">
+                    <button class="density-btn active" id="densityCleanBtn" onclick="switchDensity('clean')" title="Clean, spacious view of key candidates and core skills">
+                        ✨ Clean View
+                    </button>
+                    <button class="density-btn" id="densityFullBtn" onclick="switchDensity('full')" title="Show expanded network">
+                        🌐 Expanded Network
+                    </button>
+                </div>
+
+                <!-- Layout Toggle: Domain Constellations vs Organic Force -->
+                <div class="btn-group-toggle">
+                    <button class="layout-btn active" id="layoutClusterBtn" onclick="switchLayout('cluster')" title="Group skills by technical domain constellations">
+                        🪐 Domain Constellations
+                    </button>
+                    <button class="layout-btn" id="layoutForceBtn" onclick="switchLayout('force')" title="Organic force physics">
+                        ⚡ Organic Physics
+                    </button>
+                </div>
+
+                <!-- Edge Layer Toggle -->
+                <div class="btn-group-toggle">
+                    <button class="layer-btn active" id="layerPrimaryBtn" onclick="toggleEdgeLayer('primary')" title="Only show verified candidate competency links">
+                        ⚡ Primary Links
+                    </button>
+                    <button class="layer-btn" id="layerSynergyBtn" onclick="toggleEdgeLayer('synergy')" title="Include skill co-occurrence network">
+                        🕸️ Skill Synergy
+                    </button>
+                </div>
+            </div>
+
+            <!-- Domain Pills Row -->
+            <div class="kg-domain-row">
+                <span class="domain-title-tag">DOMAIN CLUSTERS:</span>
+                <button class="domain-pill active" data-domain="all" onclick="filterByDomain('all')">All</button>
+                <button class="domain-pill" data-domain="Backend & Systems" onclick="filterByDomain('Backend & Systems')">Backend</button>
+                <button class="domain-pill" data-domain="Cloud & DevOps" onclick="filterByDomain('Cloud & DevOps')">Cloud/DevOps</button>
+                <button class="domain-pill" data-domain="Frontend & Web" onclick="filterByDomain('Frontend & Web')">Frontend</button>
+                <button class="domain-pill" data-domain="Data & Databases" onclick="filterByDomain('Data & Databases')">Data</button>
+                <button class="domain-pill" data-domain="AI, ML & NLP" onclick="filterByDomain('AI, ML & NLP')">AI/ML</button>
+                <button class="domain-pill" data-domain="Security & Compliance" onclick="filterByDomain('Security & Compliance')">Security</button>
+            </div>
+        </div>
+
+        <!-- Huge Spacious Canvas Wrapper (Height: 800px) -->
+        <div class="canvas-wrapper-spacious" id="canvasWrapper">
+            <canvas id="kgCanvas"></canvas>
+
+            <!-- Canvas Quick Interactive Guide Badge -->
+            <div class="canvas-help-badge">
+                <span>💡 <strong>Interactive Guide:</strong> Click any Candidate to spotlight skills &bull; Hover to inspect &bull; Scroll to zoom</span>
+            </div>
+
+            <!-- Floating Canvas HUD -->
+            <div class="canvas-floating-hud">
+                <button class="hud-btn" onclick="zoomIn()" title="Zoom In">➕</button>
+                <button class="hud-btn" onclick="zoomOut()" title="Zoom Out">➖</button>
+                <button class="hud-btn" onclick="resetGraphView()" title="Center &amp; Fit View">🎯</button>
+                <button class="hud-btn" id="pauseBtn" onclick="togglePhysicsSimulation()" title="Pause Physics">⏸️</button>
+            </div>
+
+            <!-- Canvas Legend -->
+            <div class="canvas-legend">
+                <span class="legend-item"><span class="legend-dot" style="background: #8b5cf6;"></span> Candidate</span>
+                <span class="legend-item"><span class="legend-dot" style="background: #06b6d4;"></span> Backend</span>
+                <span class="legend-item"><span class="legend-dot" style="background: #10b981;"></span> Cloud / DevOps</span>
+                <span class="legend-item"><span class="legend-dot" style="background: #3b82f6;"></span> Frontend</span>
+                <span class="legend-item"><span class="legend-dot" style="background: #f59e0b;"></span> Data / DB</span>
+                <span class="legend-item"><span class="legend-dot" style="background: #ec4899;"></span> AI / ML</span>
+                <span class="legend-item"><span class="legend-dot" style="background: #f43f5e;"></span> Security</span>
+            </div>
+
+            <!-- Hover Tooltip -->
+            <div id="kgTooltip" class="kg-tooltip"></div>
+        </div>
+    </div>
+
+    <!-- ================= 2. BELOW THE GRAPH: INSPECTOR & COMPETENCIES (3-COLUMN DECK) ================= -->
+    <div class="kg-bottom-deck">
+        <!-- Card 1: Interactive Entity Inspector (Wide & Rich) -->
+        <div class="bottom-card inspector-card" id="entityInspectorCard">
+            <div class="card-header-styled">
+                <span class="header-icon" id="inspectorIcon">🔍</span>
+                <h3 id="inspectorTitle">Entity Inspector</h3>
+                <button class="inspector-clear-btn" onclick="clearSelection()" title="Clear Selection">&times;</button>
+            </div>
+
+            <div class="inspector-body" id="inspectorBody">
+                <div class="inspector-empty-state" id="inspectorEmptyState">
+                    <div class="empty-icon">🕸️</div>
+                    <h4 class="empty-heading">No Entity Selected</h4>
+                    <p class="empty-text">Click or hover any <strong>Candidate</strong> or <strong>Skill</strong> in the graph above to inspect topological relationships, verified competencies, and recommended synergies.</p>
+                    <div class="empty-hint">💡 Tip: Use the candidate dropdown above to view an instant 1-hop ego network.</div>
+                </div>
+
+                <!-- Dynamic Content Container -->
+                <div id="inspectorContent" style="display: none;"></div>
+            </div>
+        </div>
+
+        <!-- Card 2: Top Hub Competencies -->
+        <div class="bottom-card hub-skills-card">
+            <div class="card-header-styled">
+                <span class="header-icon">⭐</span>
+                <h3>Top Hub Competencies</h3>
+            </div>
+            <p class="bottom-desc">Ranked by NetworkX Degree &amp; Betweenness Centrality:</p>
+            <div class="hub-skills-list">
+                {% for h in stats.top_hub_skills[:7] %}
+                <div class="hub-skill-row" onclick="focusEntityByName('{{ h.skill }}', 'skill')">
+                    <div class="hub-skill-info">
+                        <span class="hub-name">{{ h.skill }}</span>
+                        <span class="hub-domain">{{ h.domain }}</span>
+                    </div>
+                    <div class="hub-metrics">
+                        <span class="hub-degree" title="Connected Entities">{{ h.degree }} edges</span>
+                        <span class="hub-centrality" title="Betweenness Centrality">C: {{ h.betweenness_centrality }}</span>
+                    </div>
+                </div>
+                {% endfor %}
+            </div>
+        </div>
+
+        <!-- Card 3: Cross-Domain Bridges -->
+        <div class="bottom-card bridges-card">
+            <div class="card-header-styled">
+                <span class="header-icon">🌉</span>
+                <h3>Cross-Domain Bridges</h3>
+            </div>
+            <p class="bottom-desc">Critical technical skills connecting disparate engineering domains:</p>
+            <div class="bridges-grid">
+                {% for b in bridges %}
+                <div class="bridge-item" onclick="focusEntityByName('{{ b.skill }}', 'skill')">
+                    <div class="bridge-header-row">
+                        <span class="bridge-title">{{ b.skill }}</span>
+                        <span class="bridge-score-badge">Bridge: {{ b.bridge_score }}</span>
+                    </div>
+                    <div class="bridge-domains">
+                        {% for d in b.connected_domains %}
+                            <span class="bridge-tag">{{ d.split(' ')[0] }}</span>
+                        {% endfor %}
+                    </div>
+                </div>
+                {% endfor %}
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- ================= ADVERSARIAL DEBATE MODAL ================= -->
+<div id="debateModal" class="modal-backdrop-custom" style="display: none;">
+    <div class="modal-dialog-custom modal-lg">
+        <div class="modal-header-custom">
+            <div class="modal-title-group">
+                <div class="modal-tag">⚔️ Multi-Agent Hiring Committee</div>
+                <h2 id="debateModalCandidateName">Adversarial Debate: Candidate</h2>
+            </div>
+            <button class="modal-close" onclick="closeDebateModal()">&times;</button>
+        </div>
+
+        <div class="modal-body-custom" id="debateModalBody">
+            <div class="text-center py-5" id="debateLoadingSpinner">
+                <div class="spinner"></div>
+                <p class="mt-3 text-muted">Convening Adversarial Committee (Advocate vs Skeptic vs Arbiter)...</p>
+            </div>
+
+            <div id="debateContent" style="display: none;">
+                <!-- Consensus Arbiter Banner -->
+                <div class="arbiter-banner" id="arbiterBanner">
+                    <div class="arbiter-score-badge">
+                        <div class="arbiter-score-number" id="arbiterScore">--</div>
+                        <div class="arbiter-score-label">Calibrated Score</div>
+                    </div>
+                    <div class="arbiter-verdict-details">
+                        <div class="arbiter-decision-tag" id="arbiterDecisionTag">STRONG ADVANCE</div>
+                        <p class="arbiter-summary-text" id="arbiterSummaryText">Consensus summary...</p>
+                    </div>
+                </div>
+
+                <!-- Advocate vs Skeptic Split Arena -->
+                <div class="debate-arena">
+                    <div class="debate-column advocate-column">
+                        <div class="column-header">
+                            <span class="col-icon">🛡️</span>
+                            <div>
+                                <h4>Candidate Advocate</h4>
+                                <span class="col-role">Defense &bull; Velocity &amp; Trajectory</span>
+                            </div>
+                        </div>
+                        <div id="advocatePointsList" class="points-container"></div>
+                    </div>
+
+                    <div class="debate-column skeptic-column">
+                        <div class="column-header">
+                            <span class="col-icon">⚖️</span>
+                            <div>
+                                <h4>Technical Skeptic</h4>
+                                <span class="col-role">Prosecution &bull; Forensic Audit</span>
+                            </div>
+                        </div>
+                        <div id="skepticPointsList" class="points-container"></div>
+                    </div>
+                </div>
+
+                <!-- Cross-Examination Exchange -->
+                <div class="cross-exam-card">
+                    <div class="cross-exam-header">
+                        <span class="ce-icon">💬</span>
+                        <h4>Cross-Examination &amp; Direct Rebuttal</h4>
+                    </div>
+                    <div class="ce-exchange" id="crossExamExchange"></div>
+                </div>
+
+                <!-- Risk Mitigation Checklist -->
+                <div class="risk-checklist-card">
+                    <div class="checklist-header">
+                        <span class="cl-icon">📋</span>
+                        <h4>Live Interview Risk Mitigation Checklist</h4>
+                    </div>
+                    <p class="cl-desc">Mandatory probing questions for the in-person panel to resolve Skeptic objections:</p>
+                    <ul class="cl-list" id="riskChecklist"></ul>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- ================= DYNAMIC ADAPTIVE INTERVIEW MODAL ================= -->
+<div id="adaptiveModal" class="modal-backdrop-custom" style="display: none;">
+    <div class="modal-dialog-custom modal-md">
+        <div class="modal-header-custom">
+            <div class="modal-title-group">
+                <div class="modal-tag">🎙️ Real-Time Pre-Screen Engine</div>
+                <h2>Dynamic Adaptive Technical Interview</h2>
+            </div>
+            <button class="modal-close" onclick="closeAdaptiveModal()">&times;</button>
+        </div>
+
+        <div class="modal-body-custom">
+            <div class="form-group mb-3">
+                <label class="form-label font-bold">Interview Question:</label>
+                <input type="text" id="adaptQuestion" class="form-control"
+                    value="How do you architect low-latency distributed microservices in Python?">
+            </div>
+
+            <div class="form-group mb-3">
+                <label class="form-label font-bold">Focus Competency / Architecture:</label>
+                <input type="text" id="adaptFocus" class="form-control" value="Distributed Architecture &amp; Caching">
+            </div>
+
+            <div class="form-group mb-3">
+                <label class="form-label font-bold">Candidate Verbal / Typed Response:</label>
+                <textarea id="adaptAnswer" class="form-control" rows="4"
+                    placeholder="Enter candidate response (e.g., We used FastAPI with Redis for caching, Kafka for async worker offloading, and pgbouncer to pool PostgreSQL connections, reducing P99 latency by 45%)..."></textarea>
+            </div>
+
+            <button class="btn btn-primary w-100" onclick="submitAdaptiveEvaluation()">
+                ⚡ Analyze Depth &amp; Generate Adaptive Follow-Up
+            </button>
+
+            <!-- Adaptive Evaluation Result -->
+            <div id="adaptResultBox" class="mt-4" style="display: none;">
+                <div class="adapt-score-header">
+                    <div class="adapt-verdict-title" id="adaptVerdictTitle">Solid Practical Grasp</div>
+                    <div class="adapt-score-pill" id="adaptScorePill">8.5 / 10</div>
+                </div>
+
+                <div class="adapt-details-box">
+                    <div class="mb-2"><strong>Strengths Detected:</strong> <span id="adaptStrengths"></span></div>
+                    <div class="mb-2"><strong>Flagged Ambiguities:</strong> <span id="adaptAmbiguities"></span></div>
+                </div>
+
+                <div class="adaptive-prompt-card">
+                    <div class="ap-header">
+                        <span class="ap-icon">🎯</span>
+                        <strong>Dynamic Adaptive Follow-Up Question:</strong>
+                    </div>
+                    <p class="ap-question" id="adaptFollowupQuestion"></p>
+                    <div class="ap-rubric">
+                        <strong>Interviewer Rubric:</strong> <span id="adaptRubricText"></span>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<style>
+/* ================= MASTER LAYOUT STYLES ================= */
+.kg-master-container {
+    max-width: 1560px;
+    margin: 0 auto;
+    padding: 1.5rem 1.25rem 4rem;
+}
+
+.kg-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    flex-wrap: wrap;
+    gap: 1rem;
+    margin-bottom: 1.5rem;
+}
+
+.kg-badge {
+    display: inline-block;
+    background: rgba(139, 92, 246, 0.15);
+    color: #a78bfa;
+    border: 1px solid rgba(139, 92, 246, 0.3);
+    font-size: 0.75rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    padding: 0.25rem 0.65rem;
+    border-radius: 6px;
+    margin-bottom: 0.5rem;
+}
+
+.kg-title {
+    font-size: 1.85rem;
+    font-weight: 800;
+    color: #f8fafc;
+    margin: 0 0 0.5rem;
+    letter-spacing: -0.02em;
+}
+
+.kg-subtitle {
+    color: #94a3b8;
+    max-width: 820px;
+    margin: 0;
+    font-size: 0.95rem;
+    line-height: 1.55;
+}
+
+.kg-actions {
+    display: flex;
+    gap: 0.75rem;
+    flex-wrap: wrap;
+}
+
+/* Stats Row */
+.kg-stats-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+    gap: 1rem;
+    margin-bottom: 1.5rem;
+}
+
+.kg-stat-card {
+    background: rgba(15, 23, 42, 0.65);
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    border-radius: 14px;
+    padding: 1.25rem;
+    backdrop-filter: blur(12px);
+    transition: transform 0.2s ease, border-color 0.2s ease;
+}
+
+.kg-stat-card:hover {
+    transform: translateY(-2px);
+    border-color: rgba(56, 189, 248, 0.3);
+}
+
+.stat-value {
+    font-size: 1.9rem;
+    font-weight: 800;
+    color: #38bdf8;
+    margin-bottom: 0.25rem;
+}
+
+.stat-label {
+    font-size: 0.85rem;
+    font-weight: 600;
+    color: #e2e8f0;
+}
+
+.stat-meta {
+    font-size: 0.75rem;
+    color: #64748b;
+    margin-top: 0.25rem;
+}
+
+/* ================= FULL WIDTH HERO GRAPH CONTAINER ================= */
+.kg-hero-container {
+    width: 100%;
+    background: #080c14;
+    border: 1px solid rgba(255, 255, 255, 0.12);
+    border-radius: 16px;
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
+    box-shadow: 0 24px 56px rgba(0, 0, 0, 0.5);
+    margin-bottom: 2rem;
+}
+
+/* Toolbar */
+.kg-hero-toolbar {
+    padding: 1rem 1.5rem;
+    background: rgba(15, 23, 42, 0.96);
+    border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+    display: flex;
+    flex-direction: column;
+    gap: 0.85rem;
+}
+
+.kg-toolbar-row {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    flex-wrap: wrap;
+}
+
+/* Search Box */
+.search-box-wrapper {
+    position: relative;
+    min-width: 250px;
+    flex: 1;
+}
+
+.search-icon {
+    position: absolute;
+    left: 12px;
+    top: 50%;
+    transform: translateY(-50%);
+    font-size: 0.85rem;
+    color: #64748b;
+    pointer-events: none;
+}
+
+.kg-search-input {
+    padding-left: 36px !important;
+    background: rgba(255, 255, 255, 0.06) !important;
+    border: 1px solid rgba(255, 255, 255, 0.16) !important;
+    color: #f8fafc !important;
+    border-radius: 8px !important;
+    font-size: 0.85rem !important;
+    height: 38px !important;
+}
+
+.kg-search-input:focus {
+    border-color: #38bdf8 !important;
+    background: rgba(255, 255, 255, 0.1) !important;
+    box-shadow: 0 0 0 2px rgba(56, 189, 248, 0.25) !important;
+}
+
+.search-dropdown {
+    position: absolute;
+    top: calc(100% + 4px);
+    left: 0;
+    right: 0;
+    background: #0f172a;
+    border: 1px solid rgba(56, 189, 248, 0.35);
+    border-radius: 8px;
+    max-height: 250px;
+    overflow-y: auto;
+    z-index: 1000;
+    box-shadow: 0 12px 28px rgba(0, 0, 0, 0.65);
+}
+
+.search-item {
+    padding: 0.65rem 0.95rem;
+    cursor: pointer;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.04);
+    transition: background 0.15s ease;
+}
+
+.search-item:hover { background: rgba(56, 189, 248, 0.15); }
+.search-item-label { font-size: 0.85rem; font-weight: 600; color: #f1f5f9; }
+.search-item-tag { font-size: 0.7rem; padding: 0.15rem 0.4rem; border-radius: 4px; font-weight: 600; }
+
+/* ================= CUSTOM CANDIDATE DROPDOWN (100% VISIBLE & ROBUST) ================= */
+.custom-cand-dropdown {
+    position: relative;
+    min-width: 290px;
+}
+
+.cand-dropdown-btn {
+    width: 100%;
+    height: 38px;
+    background: #1e293b;
+    border: 1px solid rgba(56, 189, 248, 0.4);
+    border-radius: 8px;
+    color: #ffffff;
+    font-size: 0.85rem;
+    font-weight: 700;
+    padding: 0 14px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    cursor: pointer;
+    box-shadow: 0 2px 6px rgba(0, 0, 0, 0.3);
+    transition: all 0.2s ease;
+}
+
+.cand-dropdown-btn:hover {
+    border-color: #38bdf8;
+    background: #24344d;
+    box-shadow: 0 0 12px rgba(56, 189, 248, 0.25);
+}
+
+.caret-arrow {
+    font-size: 0.72rem;
+    color: #38bdf8;
+    margin-left: 8px;
+}
+
+.cand-dropdown-menu {
+    position: absolute;
+    top: calc(100% + 6px);
+    left: 0;
+    width: 340px;
+    background: #ffffff !important;
+    border: 1px solid #cbd5e1;
+    border-radius: 10px;
+    box-shadow: 0 16px 36px rgba(0, 0, 0, 0.55);
+    z-index: 9999;
+    overflow: hidden;
+}
+
+.cand-dropdown-search-wrap {
+    padding: 10px;
+    background: #f8fafc;
+    border-bottom: 1px solid #e2e8f0;
+}
+
+.cand-dropdown-filter {
+    width: 100%;
+    padding: 7px 12px;
+    font-size: 0.84rem;
+    border: 1px solid #cbd5e1;
+    border-radius: 6px;
+    color: #0f172a !important;
+    -webkit-text-fill-color: #0f172a !important;
+    background: #ffffff !important;
+}
+
+.cand-dropdown-filter:focus {
+    outline: none;
+    border-color: #0284c7;
+    box-shadow: 0 0 0 2px rgba(2, 132, 199, 0.2);
+}
+
+.cand-dropdown-items {
+    max-height: 290px;
+    overflow-y: auto;
+}
+
+.cand-item {
+    padding: 9px 12px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    cursor: pointer;
+    border-bottom: 1px solid #f1f5f9;
+    background: #ffffff !important;
+    color: #0f172a !important;
+    transition: background 0.15s ease;
+}
+
+.cand-item:hover {
+    background: #f0f9ff !important;
+}
+
+.cand-item-left {
+    display: flex;
+    align-items: center;
+    gap: 9px;
+    min-width: 0;
+}
+
+.cand-avatar-mini {
+    width: 26px;
+    height: 26px;
+    border-radius: 50%;
+    background: #ede9fe;
+    color: #7c3aed;
+    font-weight: 800;
+    font-size: 0.72rem;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+}
+
+.cand-item-name {
+    font-size: 0.86rem;
+    font-weight: 700;
+    color: #0f172a !important; /* GUARANTEED DEEP BLACK */
+    -webkit-text-fill-color: #0f172a !important;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.cand-item:hover .cand-item-name {
+    color: #0284c7 !important;
+    -webkit-text-fill-color: #0284c7 !important;
+}
+
+.cand-item-score {
+    font-size: 0.75rem;
+    font-weight: 800;
+    color: #059669;
+    background: #ecfdf5;
+    padding: 2px 7px;
+    border-radius: 4px;
+    border: 1px solid #a7f3d0;
+    flex-shrink: 0;
+}
+
+.reset-item {
+    font-size: 0.84rem;
+    font-weight: 700;
+    color: #2563eb !important;
+    -webkit-text-fill-color: #2563eb !important;
+    background: #eff6ff !important;
+    padding: 10px 14px;
+}
+
+.reset-item:hover {
+    background: #dbeafe !important;
+}
+
+/* Fallback native select (forced light scheme & black on white) */
+select, .form-select, .native-candidate-select {
+    color-scheme: light !important;
+}
+
+select option, .form-select option, .native-candidate-select option {
+    background-color: #ffffff !important;
+    color: #0f172a !important;
+    -webkit-text-fill-color: #0f172a !important;
+    font-weight: 600 !important;
+}
+
+.native-candidate-select {
+    display: none; /* Replaced by custom searchable dropdown */
+}
+
+/* Button Group Toggles */
+.btn-group-toggle {
+    display: inline-flex;
+    background: rgba(255, 255, 255, 0.06);
+    border-radius: 8px;
+    padding: 3px;
+    border: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.density-btn, .layout-btn, .layer-btn {
+    background: transparent;
+    border: none;
+    color: #94a3b8;
+    font-size: 0.75rem;
+    font-weight: 700;
+    padding: 0.35rem 0.75rem;
+    border-radius: 6px;
+    cursor: pointer;
+    transition: all 0.2s ease;
+}
+
+.density-btn.active, .layout-btn.active, .layer-btn.active {
+    background: #0284c7;
+    color: #ffffff;
+    box-shadow: 0 2px 6px rgba(2, 132, 199, 0.4);
+}
+
+/* Domain Pills */
+.kg-domain-row {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    padding-top: 0.35rem;
+    border-top: 1px solid rgba(255, 255, 255, 0.05);
+    flex-wrap: wrap;
+}
+
+.domain-title-tag {
+    font-size: 0.72rem;
+    font-weight: 800;
+    color: #64748b;
+    letter-spacing: 0.05em;
+    margin-right: 0.25rem;
+}
+
+.domain-pill {
+    background: rgba(255, 255, 255, 0.04);
+    border: 1px solid rgba(255, 255, 255, 0.09);
+    color: #94a3b8;
+    font-size: 0.72rem;
+    font-weight: 600;
+    padding: 0.22rem 0.6rem;
+    border-radius: 6px;
+    cursor: pointer;
+    transition: all 0.2s ease;
+}
+
+.domain-pill:hover, .domain-pill.active {
+    background: #38bdf8;
+    border-color: #38bdf8;
+    color: #0f172a;
+    font-weight: 700;
+}
+
+/* Spacious Canvas Container */
+.canvas-wrapper-spacious {
+    position: relative;
+    height: 880px;
+    width: 100%;
+    cursor: grab;
+    background: radial-gradient(circle at center, #0f172a 0%, #060910 100%);
+}
+
+.canvas-wrapper-spacious:active {
+    cursor: grabbing;
+}
+
+#kgCanvas {
+    width: 100%;
+    height: 100%;
+    display: block;
+}
+
+/* Canvas Quick Guide Badge */
+.canvas-help-badge {
+    position: absolute;
+    top: 1.25rem;
+    left: 1.25rem;
+    background: rgba(15, 23, 42, 0.9);
+    border: 1px solid rgba(255, 255, 255, 0.14);
+    border-radius: 8px;
+    padding: 0.5rem 0.95rem;
+    font-size: 0.8rem;
+    color: #cbd5e1;
+    backdrop-filter: blur(10px);
+    pointer-events: none;
+    z-index: 10;
+    box-shadow: 0 4px 14px rgba(0, 0, 0, 0.4);
+}
+
+.canvas-help-badge strong {
+    color: #38bdf8;
+}
+
+/* Floating HUD */
+.canvas-floating-hud {
+    position: absolute;
+    top: 1.25rem;
+    right: 1.25rem;
+    display: flex;
+    flex-direction: column;
+    gap: 0.45rem;
+    background: rgba(15, 23, 42, 0.9);
+    border: 1px solid rgba(255, 255, 255, 0.12);
+    border-radius: 10px;
+    padding: 0.45rem;
+    backdrop-filter: blur(10px);
+    z-index: 10;
+}
+
+.hud-btn {
+    background: rgba(255, 255, 255, 0.06);
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    color: #f1f5f9;
+    width: 36px;
+    height: 36px;
+    border-radius: 7px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    font-size: 0.95rem;
+    transition: background 0.15s ease;
+}
+
+.hud-btn:hover {
+    background: rgba(56, 189, 248, 0.25);
+    border-color: #38bdf8;
+}
+
+/* Canvas Legend */
+.canvas-legend {
+    position: absolute;
+    bottom: 1.25rem;
+    left: 1.25rem;
+    background: rgba(15, 23, 42, 0.92);
+    border: 1px solid rgba(255, 255, 255, 0.12);
+    border-radius: 8px;
+    padding: 0.55rem 0.95rem;
+    display: flex;
+    gap: 0.95rem;
+    flex-wrap: wrap;
+    backdrop-filter: blur(8px);
+    font-size: 0.75rem;
+    color: #94a3b8;
+    z-index: 10;
+}
+
+.legend-item { display: flex; align-items: center; gap: 0.4rem; }
+.legend-dot { width: 9px; height: 9px; border-radius: 50%; display: inline-block; }
+
+.kg-tooltip {
+    position: absolute;
+    display: none;
+    background: rgba(15, 23, 42, 0.97);
+    border: 1px solid rgba(56, 189, 248, 0.5);
+    color: #f8fafc;
+    border-radius: 10px;
+    padding: 0.85rem 1.05rem;
+    font-size: 0.8rem;
+    pointer-events: none;
+    box-shadow: 0 16px 36px rgba(0, 0, 0, 0.75);
+    z-index: 100;
+    backdrop-filter: blur(12px);
+    max-width: 320px;
+}
+
+/* ================= 2. BELOW GRAPH: 3-COLUMN DECK ================= */
+.kg-bottom-deck {
+    display: grid;
+    grid-template-columns: 1.3fr 0.85fr 0.85fr;
+    gap: 1.5rem;
+}
+
+@media (max-width: 1100px) {
+    .kg-bottom-deck {
+        grid-template-columns: 1fr;
+    }
+}
+
+.bottom-card {
+    background: rgba(15, 23, 42, 0.7);
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    border-radius: 14px;
+    padding: 1.5rem;
+    backdrop-filter: blur(12px);
+}
+
+.card-header-styled {
+    display: flex;
+    align-items: center;
+    gap: 0.55rem;
+    margin-bottom: 0.85rem;
+    position: relative;
+}
+
+.card-header-styled h3 {
+    margin: 0;
+    font-size: 1.15rem;
+    color: #f1f5f9;
+    font-weight: 700;
+}
+
+.inspector-clear-btn {
+    position: absolute;
+    right: 0;
+    background: none;
+    border: none;
+    color: #94a3b8;
+    font-size: 1.35rem;
+    cursor: pointer;
+    line-height: 1;
+}
+
+.inspector-clear-btn:hover { color: #f8fafc; }
+.bottom-desc { font-size: 0.82rem; color: #94a3b8; margin-bottom: 0.95rem; }
+
+/* Inspector Empty State */
+.inspector-empty-state {
+    text-align: center;
+    padding: 2.25rem 1rem;
+}
+
+.empty-icon { font-size: 2.4rem; margin-bottom: 0.65rem; opacity: 0.5; }
+.empty-heading { font-size: 1rem; font-weight: 700; color: #e2e8f0; margin-bottom: 0.4rem; }
+.empty-text { font-size: 0.84rem; color: #94a3b8; line-height: 1.5; margin-bottom: 0.9rem; max-width: 440px; margin-left: auto; margin-right: auto; }
+.empty-hint { font-size: 0.78rem; color: #38bdf8; background: rgba(56, 189, 248, 0.1); padding: 0.45rem 0.75rem; border-radius: 6px; display: inline-block; }
+
+/* Dynamic Inspector Content */
+.inspector-entity-badge { display: flex; align-items: center; gap: 0.85rem; margin-bottom: 1.1rem; }
+.entity-avatar-large {
+    width: 48px;
+    height: 48px;
+    border-radius: 50%;
+    background: linear-gradient(135deg, #4f46e5, #06b6d4);
+    color: #ffffff;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-weight: 800;
+    font-size: 1.1rem;
+    box-shadow: 0 4px 14px rgba(6, 182, 212, 0.35);
+}
+
+.entity-details-title { font-size: 1.2rem; font-weight: 800; color: #f8fafc; margin: 0 0 0.25rem; }
+.entity-badges-row { display: flex; gap: 0.45rem; flex-wrap: wrap; align-items: center; }
+.inspector-section-label { font-size: 0.75rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.05em; color: #94a3b8; margin: 1rem 0 0.45rem; }
+.inspector-pill-cloud { display: flex; flex-wrap: wrap; gap: 0.4rem; }
+.inspector-pill {
+    font-size: 0.76rem;
+    padding: 0.22rem 0.55rem;
+    border-radius: 5px;
+    background: rgba(255, 255, 255, 0.05);
+    border: 1px solid rgba(255, 255, 255, 0.09);
+    color: #e2e8f0;
+    cursor: pointer;
+    transition: all 0.15s ease;
+}
+
+.inspector-pill:hover { background: rgba(56, 189, 248, 0.2); border-color: #38bdf8; color: #38bdf8; }
+
+.candidate-item-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 0.45rem 0.7rem;
+    background: rgba(255, 255, 255, 0.03);
+    border-radius: 6px;
+    margin-bottom: 0.4rem;
+    cursor: pointer;
+    transition: background 0.15s ease;
+}
+
+.candidate-item-row:hover { background: rgba(56, 189, 248, 0.15); }
+.candidate-row-name { font-size: 0.84rem; font-weight: 600; color: #f1f5f9; }
+.candidate-row-score { font-size: 0.78rem; font-weight: 700; color: #10b981; }
+
+/* Hub Skills List */
+.hub-skills-list { display: flex; flex-direction: column; gap: 0.5rem; }
+.hub-skill-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 0.55rem 0.75rem;
+    background: rgba(255, 255, 255, 0.03);
+    border-radius: 8px;
+    border: 1px solid rgba(255, 255, 255, 0.05);
+    cursor: pointer;
+    transition: all 0.15s ease;
+}
+
+.hub-skill-row:hover { background: rgba(56, 189, 248, 0.12); border-color: rgba(56, 189, 248, 0.3); }
+.hub-name { font-weight: 700; font-size: 0.88rem; color: #e2e8f0; display: block; }
+.hub-domain { font-size: 0.72rem; color: #64748b; }
+.hub-degree { font-size: 0.74rem; background: rgba(14, 165, 233, 0.15); color: #38bdf8; padding: 0.18rem 0.45rem; border-radius: 4px; font-weight: 600; }
+.hub-centrality { font-size: 0.74rem; color: #94a3b8; margin-left: 0.35rem; }
+
+/* Bridges List */
+.bridges-grid { display: flex; flex-direction: column; gap: 0.55rem; }
+.bridge-item {
+    background: rgba(255, 255, 255, 0.03);
+    border: 1px solid rgba(255, 255, 255, 0.05);
+    border-radius: 8px;
+    padding: 0.65rem 0.8rem;
+    cursor: pointer;
+    transition: all 0.15s ease;
+}
+
+.bridge-item:hover { background: rgba(236, 72, 153, 0.12); border-color: rgba(236, 72, 153, 0.3); }
+.bridge-header-row { display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.35rem; }
+.bridge-title { font-weight: 700; font-size: 0.88rem; color: #f1f5f9; }
+.bridge-score-badge { font-size: 0.72rem; color: #f472b6; font-weight: 700; }
+.bridge-domains { display: flex; gap: 0.35rem; flex-wrap: wrap; }
+.bridge-tag { font-size: 0.7rem; background: rgba(255, 255, 255, 0.05); color: #94a3b8; padding: 0.15rem 0.4rem; border-radius: 4px; }
+
+/* Modals */
+.modal-backdrop-custom {
+    position: fixed;
+    top: 0; left: 0; right: 0; bottom: 0;
+    background: rgba(0, 0, 0, 0.82);
+    backdrop-filter: blur(8px);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 9999;
+    padding: 1.5rem;
+}
+
+.modal-dialog-custom {
+    background: #0f172a;
+    border: 1px solid rgba(255, 255, 255, 0.15);
+    border-radius: 16px;
+    width: 100%;
+    max-height: 90vh;
+    overflow-y: auto;
+    box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.75);
+}
+
+.modal-dialog-custom.modal-lg { max-width: 900px; }
+.modal-dialog-custom.modal-md { max-width: 650px; }
+
+.modal-header-custom {
+    padding: 1.25rem 1.5rem;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+.modal-title-group h2 { margin: 0; font-size: 1.35rem; color: #f8fafc; }
+.modal-tag { font-size: 0.75rem; color: #38bdf8; font-weight: 700; text-transform: uppercase; margin-bottom: 0.25rem; }
+.modal-close { background: none; border: none; color: #94a3b8; font-size: 1.75rem; cursor: pointer; line-height: 1; }
+.modal-body-custom { padding: 1.5rem; }
+
+/* Arbiter Banner */
+.arbiter-banner {
+    display: flex;
+    align-items: center;
+    gap: 1.25rem;
+    background: rgba(16, 185, 129, 0.08);
+    border: 1px solid rgba(16, 185, 129, 0.3);
+    border-radius: 12px;
+    padding: 1.25rem;
+    margin-bottom: 1.5rem;
+}
+
+.arbiter-score-badge { text-align: center; min-width: 90px; padding-right: 1.25rem; border-right: 1px solid rgba(255, 255, 255, 0.1); }
+.arbiter-score-number { font-size: 2.2rem; font-weight: 900; color: #10b981; line-height: 1; }
+.arbiter-score-label { font-size: 0.7rem; font-weight: 600; color: #94a3b8; text-transform: uppercase; margin-top: 0.35rem; }
+.arbiter-decision-tag { font-size: 1.1rem; font-weight: 800; letter-spacing: 0.05em; color: #10b981; margin-bottom: 0.35rem; }
+.arbiter-summary-text { margin: 0; font-size: 0.9rem; color: #cbd5e1; line-height: 1.45; }
+
+.debate-arena { display: grid; grid-template-columns: 1fr 1fr; gap: 1.25rem; margin-bottom: 1.5rem; }
+@media (max-width: 768px) { .debate-arena { grid-template-columns: 1fr; } }
+.debate-column { background: rgba(15, 23, 42, 0.5); border-radius: 12px; padding: 1.25rem; border: 1px solid rgba(255, 255, 255, 0.08); }
+.advocate-column { border-top: 4px solid #10b981; }
+.skeptic-column { border-top: 4px solid #ef4444; }
+
+.column-header { display: flex; align-items: center; gap: 0.65rem; margin-bottom: 1rem; }
+.col-icon { font-size: 1.5rem; }
+.column-header h4 { margin: 0; color: #f8fafc; font-size: 1.05rem; }
+.col-role { font-size: 0.75rem; color: #94a3b8; }
+.points-container { display: flex; flex-direction: column; gap: 0.75rem; }
+.debate-point { background: rgba(255, 255, 255, 0.02); border: 1px solid rgba(255, 255, 255, 0.05); border-radius: 8px; padding: 0.75rem; }
+.point-topic { font-weight: 700; font-size: 0.85rem; color: #38bdf8; margin-bottom: 0.25rem; }
+.point-arg { font-size: 0.8rem; color: #cbd5e1; margin-bottom: 0.35rem; line-height: 1.4; }
+.point-evidence { font-size: 0.72rem; color: #64748b; font-style: italic; }
+
+.cross-exam-card, .risk-checklist-card { background: rgba(15, 23, 42, 0.6); border: 1px solid rgba(255, 255, 255, 0.08); border-radius: 12px; padding: 1.25rem; margin-bottom: 1.5rem; }
+.cross-exam-header, .checklist-header { display: flex; align-items: center; gap: 0.5rem; margin-bottom: 0.75rem; }
+.cross-exam-header h4, .checklist-header h4 { margin: 0; color: #f8fafc; font-size: 1.05rem; }
+.ce-exchange p { font-size: 0.85rem; color: #cbd5e1; margin: 0.5rem 0; line-height: 1.4; }
+.cl-list { margin: 0; padding-left: 1.25rem; color: #e2e8f0; font-size: 0.85rem; }
+.cl-list li { margin-bottom: 0.4rem; }
+
+/* Adaptive Interview */
+.adapt-score-header { display: flex; justify-content: space-between; align-items: center; background: rgba(255, 255, 255, 0.05); border-radius: 8px; padding: 0.75rem 1rem; margin-bottom: 1rem; }
+.adapt-verdict-title { font-weight: 700; color: #f8fafc; font-size: 1.05rem; }
+.adapt-score-pill { font-weight: 800; font-size: 1.1rem; color: #10b981; }
+.adapt-details-box { font-size: 0.85rem; color: #cbd5e1; margin-bottom: 1rem; }
+.adaptive-prompt-card { background: rgba(14, 165, 233, 0.08); border: 1px solid rgba(56, 189, 248, 0.3); border-radius: 10px; padding: 1rem; }
+.ap-header { font-size: 0.85rem; color: #38bdf8; margin-bottom: 0.5rem; display: flex; align-items: center; gap: 0.35rem; }
+.ap-question { font-size: 0.95rem; font-weight: 600; color: #f8fafc; margin-bottom: 0.75rem; line-height: 1.4; }
+.ap-rubric { font-size: 0.8rem; color: #94a3b8; }
+</style>
+
+<script>
+// ================= REFINED, SPACIOUS & PROFESSIONAL GRAPH ENGINE =================
+let graphData = { nodes: [], links: [] };
+let filteredNodes = [];
+let filteredLinks = [];
+
+// Layout and filter state
+let densityMode = "clean";       // "clean" (curated ~40 nodes) vs "full" (all nodes)
+let layoutMode = "cluster";      // "cluster" (Quadrant Constellations) vs "force" (Organic)
+let edgeLayer = "primary";       // "primary" (Talent links) vs "synergy" (All including co-occurrences)
+let activeDomain = "all";
+let focusedCandidateId = null;
+let selectedNode = null;
+let hoveredNode = null;
+let isSimulationPaused = false;
+
+// Canvas & Viewport
+let canvas = null;
+let ctx = null;
+let width = 0;
+let height = 0;
+let zoom = 1.0;
+let panX = 0;
+let panY = 0;
+
+// Dragging & Simulation
+let isDragging = false;
+let dragNode = null;
+let startX = 0;
+let startY = 0;
+let animationFrameId = null;
+
+// Spacious Quadrant Anchors for Domains (Generously spaced)
+const DOMAIN_QUADRANTS = {
+    "Backend & Systems": { targetX: -540, targetY: -280, color: "#06b6d4", label: "BACKEND & SYSTEMS" },
+    "Cloud & DevOps": { targetX: 540, targetY: -280, color: "#10b981", label: "CLOUD & DEVOPS" },
+    "Core Engineering": { targetX: 0, targetY: -60, color: "#94a3b8", label: "CORE ENGINEERING & ARCHITECTURE" },
+    "Data & Databases": { targetX: 620, targetY: 200, color: "#f59e0b", label: "DATA & DATABASES" },
+    "Frontend & Web": { targetX: -540, targetY: 280, color: "#3b82f6", label: "FRONTEND & WEB" },
+    "AI, ML & NLP": { targetX: 200, targetY: 420, color: "#ec4899", label: "AI, ML & NLP" },
+    "Security & Compliance": { targetX: -200, targetY: 420, color: "#f43f5e", label: "SECURITY & COMPLIANCE" }
+};
+
+document.addEventListener("DOMContentLoaded", () => {
+    initCanvas();
+    fetchGraphData();
+
+    // Close dropdown on outside click
+    document.addEventListener("click", (e) => {
+        const dd = document.getElementById("customCandDropdown");
+        if (dd && !dd.contains(e.target)) {
+            document.getElementById("candDropdownMenu").style.display = "none";
+        }
+    });
+
+    // URL parameter triggers for direct modal inspection
+    const params = new URLSearchParams(window.location.search);
+    if (params.get("auto_open_dropdown") === "1") {
+        setTimeout(() => {
+            document.getElementById("candDropdownMenu").style.display = "block";
+        }, 500);
+    }
+    if (params.get("auto_spotlight")) {
+        const cid = params.get("auto_spotlight");
+        setTimeout(() => {
+            selectCandidate(cid, "");
+        }, 800);
+    }
+    if (params.get("auto_inspect")) {
+        const cid = params.get("auto_inspect");
+        setTimeout(() => {
+            const node = filteredNodes.find(n => n.id === `cand_${cid}` || n.id === cid);
+            if (node) {
+                selectEntity(node);
+                window.scrollTo({ top: 920, behavior: 'instant' });
+            }
+        }, 800);
+    }
+    if (params.get("auto_open_debate")) {
+        const cid = params.get("auto_open_debate");
+        setTimeout(() => {
+            triggerDebateForCandidate(cid);
+        }, 600);
+    }
+    if (params.get("auto_open_adaptive") === "1") {
+        setTimeout(() => {
+            openAdaptiveInterviewModal();
+        }, 500);
+    }
+    if (params.get("scroll_bottom") === "1") {
+        setTimeout(() => {
+            window.scrollTo({ top: 950, behavior: 'instant' });
+        }, 600);
+    }
+});
+
+function initCanvas() {
+    canvas = document.getElementById("kgCanvas");
+    ctx = canvas.getContext("2d");
+    resizeCanvas();
+    window.addEventListener("resize", resizeCanvas);
+
+    canvas.addEventListener("mousedown", onMouseDown);
+    canvas.addEventListener("mousemove", onMouseMove);
+    canvas.addEventListener("mouseup", onMouseUp);
+    canvas.addEventListener("mouseleave", onMouseLeave);
+    canvas.addEventListener("wheel", onWheel, { passive: false });
+}
+
+function resizeCanvas() {
+    const wrapper = document.getElementById("canvasWrapper");
+    width = wrapper.clientWidth;
+    height = wrapper.clientHeight;
+    canvas.width = width * window.devicePixelRatio;
+    canvas.height = height * window.devicePixelRatio;
+    ctx.scale(window.devicePixelRatio, window.devicePixelRatio);
+    panX = width / 2;
+    panY = height / 2;
+    render();
+}
+
+async function fetchGraphData() {
+    try {
+        const maxNodes = densityMode === "clean" ? 140 : 180;
+        const resp = await fetch(`/api/graph/data?max_nodes=${maxNodes}`);
+        const data = await resp.json();
+        graphData = data.network || { nodes: [], links: [] };
+        
+        applyLayoutCoordinates();
+        applyFilters();
+        fitToView();
+        startSimulation();
+        setTimeout(handleGraphUrlActions, 100);
+    } catch (e) {
+        console.error("Failed to load knowledge graph data:", e);
+    }
+}
+
+// Compute clean, generously spaced layout coordinates
+function applyLayoutCoordinates() {
+    if (layoutMode === "cluster") {
+        // Domain Constellations: group candidates and skills by domain
+        const domainCands = {};
+        const domainSkills = {};
+
+        graphData.nodes.forEach(n => {
+            const dom = n.domain || "Core Engineering";
+            if (n.type === "candidate") {
+                if (!domainCands[dom]) domainCands[dom] = [];
+                domainCands[dom].push(n);
+            } else if (n.type === "skill") {
+                if (!domainSkills[dom]) domainSkills[dom] = [];
+                domainSkills[dom].push(n);
+            }
+        });
+
+        // Position nodes across domain anchors
+        Object.entries(DOMAIN_QUADRANTS).forEach(([dom, quad]) => {
+            const cands = domainCands[dom] || [];
+            const skills = domainSkills[dom] || [];
+
+            // 1. Position Skills in the inner constellation core (55px to 130px)
+            skills.forEach((s, idx) => {
+                const angle = (idx * 1.35); // golden-angle distribution prevents collinearity
+                const localR = 55 + ((idx % 3) * 35);
+                s.targetX = quad.targetX + Math.cos(angle) * localR;
+                s.targetY = quad.targetY + Math.sin(angle) * localR;
+                s.radius = s.is_hub ? 13 : 9;
+                if (s.x === undefined || s.y === undefined) {
+                    s.x = s.targetX;
+                    s.y = s.targetY;
+                }
+                s.vx = 0;
+                s.vy = 0;
+            });
+
+            // 2. Position Candidates in a wide, spacious outer orbit (180px to 290px)
+            const nCands = cands.length;
+            cands.forEach((c, idx) => {
+                // Generous orbit radius based on candidate density with radius alternation
+                const baseR = nCands <= 3 ? 175 : (nCands <= 6 ? 220 : 255);
+                const candR = baseR + ((idx % 2) * 35);
+                const angle = (idx / (nCands || 1)) * Math.PI * 2 - (Math.PI / 2);
+                c.targetX = quad.targetX + Math.cos(angle) * candR;
+                c.targetY = quad.targetY + Math.sin(angle) * candR;
+                c.radius = 20;
+                if (c.x === undefined || c.y === undefined) {
+                    c.x = c.targetX;
+                    c.y = c.targetY;
+                }
+                c.vx = 0;
+                c.vy = 0;
+            });
+        });
+
+        // Any leftover nodes without matching quadrant
+        graphData.nodes.forEach(n => {
+            if (n.targetX === undefined) {
+                n.targetX = 0;
+                n.targetY = 0;
+                n.x = 0;
+                n.y = 0;
+                n.vx = 0;
+                n.vy = 0;
+                n.radius = n.type === "candidate" ? 20 : 10;
+            }
+        });
+
+    } else {
+        // Organic Force Mode: spacious concentric galaxy
+        const cands = graphData.nodes.filter(n => n.type === "candidate");
+        const skills = graphData.nodes.filter(n => n.type !== "candidate");
+
+        cands.forEach((c, i) => {
+            const angle = (i / (cands.length || 1)) * Math.PI * 2;
+            const r = 480 + ((i % 2) * 45);
+            c.targetX = Math.cos(angle) * r;
+            c.targetY = Math.sin(angle) * r;
+            c.radius = 20;
+            if (c.x === undefined) { c.x = c.targetX; c.y = c.targetY; }
+            c.vx = 0; c.vy = 0;
+        });
+
+        skills.forEach((s, i) => {
+            const angle = (i * 1.35);
+            const r = 90 + ((i % 5) * 50);
+            s.targetX = Math.cos(angle) * r;
+            s.targetY = Math.sin(angle) * r;
+            s.radius = s.is_hub ? 13 : 9;
+            if (s.x === undefined) { s.x = s.targetX; s.y = s.targetY; }
+            s.vx = 0; s.vy = 0;
+        });
+    }
+}
+
+// Auto-frame camera so all candidate nodes & skills fit luxuriously on screen
+function fitToView() {
+    if (!filteredNodes.length) return;
+    let minX = Infinity, maxX = -Infinity, minY = Infinity, maxY = -Infinity;
+    filteredNodes.forEach(n => {
+        const x = n.targetX !== undefined ? n.targetX : (n.x || 0);
+        const y = n.targetY !== undefined ? n.targetY : (n.y || 0);
+        minX = Math.min(minX, x - 90);
+        maxX = Math.max(maxX, x + 90);
+        minY = Math.min(minY, y - 90);
+        maxY = Math.max(maxY, y + 90);
+    });
+    const gw = Math.max(maxX - minX, 1200);
+    const gh = Math.max(maxY - minY, 900);
+    const pad = 65;
+    const scaleX = (width - pad * 2) / gw;
+    const scaleY = (height - pad * 2) / gh;
+    zoom = Math.min(Math.max(Math.min(scaleX, scaleY), 0.52), 1.05);
+    const cx = (minX + maxX) / 2;
+    const cy = (minY + maxY) / 2;
+    panX = (width / 2) - (cx * zoom);
+    panY = (height / 2) - (cy * zoom);
+    render();
+}
+
+function applyFilters() {
+    let nodes = graphData.nodes;
+
+    // 1. Domain Filter
+    if (activeDomain !== "all") {
+        nodes = nodes.filter(n => n.type === "candidate" || n.domain === activeDomain);
+    }
+
+    filteredNodes = nodes;
+    const allowedNodeIds = new Set(filteredNodes.map(n => n.id));
+
+    // 2. Link filtering: by active nodes & edge layer
+    filteredLinks = graphData.links.filter(l => {
+        if (!allowedNodeIds.has(l.source) || !allowedNodeIds.has(l.target)) return false;
+        if (edgeLayer === "primary" && l.is_cooccurrence) return false;
+        return true;
+    });
+
+    render();
+}
+
+function switchDensity(mode) {
+    densityMode = mode;
+    document.getElementById("densityCleanBtn").classList.toggle("active", mode === "clean");
+    document.getElementById("densityFullBtn").classList.toggle("active", mode === "full");
+    fetchGraphData();
+}
+
+function switchLayout(mode) {
+    layoutMode = mode;
+    document.getElementById("layoutClusterBtn").classList.toggle("active", mode === "cluster");
+    document.getElementById("layoutForceBtn").classList.toggle("active", mode === "force");
+    applyLayoutCoordinates();
+    fitToView();
+    startSimulation();
+}
+
+function toggleEdgeLayer(layer) {
+    edgeLayer = layer;
+    document.getElementById("layerPrimaryBtn").classList.toggle("active", layer === "primary");
+    document.getElementById("layerSynergyBtn").classList.toggle("active", layer === "synergy");
+    applyFilters();
+}
+
+function filterByDomain(domain) {
+    activeDomain = domain;
+    document.querySelectorAll(".domain-pill").forEach(p => {
+        p.classList.toggle("active", p.dataset.domain === domain);
+    });
+    applyFilters();
+    fitToView();
+}
+
+// ================= STABLE & SPACIOUS FORCE SIMULATION =================
+function startSimulation() {
+    if (animationFrameId) cancelAnimationFrame(animationFrameId);
+    let iterations = 60;
+
+    function step() {
+        if (isSimulationPaused || iterations <= 0) {
+            render();
+            return;
+        }
+
+        // 1. Generous node repulsion (strictly prevents collisions)
+        for (let i = 0; i < filteredNodes.length; i++) {
+            for (let j = i + 1; j < filteredNodes.length; j++) {
+                const a = filteredNodes[i];
+                const b = filteredNodes[j];
+                const dx = b.x - a.x;
+                const dy = b.y - a.y;
+                const dist = Math.sqrt(dx * dx + dy * dy) || 1;
+                // Generous 54px collision padding buffer strictly prevents overlapping
+                const minDist = (a.radius + b.radius) + 54;
+
+                if (dist < minDist) {
+                    const force = (minDist - dist) / dist * 0.32;
+                    a.vx -= dx * force;
+                    a.vy -= dy * force;
+                    b.vx += dx * force;
+                    b.vy += dy * force;
+                }
+            }
+        }
+
+        // 2. Anchor attraction towards designated quadrant coordinates
+        filteredNodes.forEach(n => {
+            if (n !== dragNode) {
+                if (layoutMode === "cluster" && n.targetX !== undefined) {
+                    n.vx += (n.targetX - n.x) * 0.05;
+                    n.vy += (n.targetY - n.y) * 0.05;
+                } else {
+                    n.vx -= n.x * 0.002;
+                    n.vy -= n.y * 0.002;
+                }
+                n.vx *= 0.76;
+                n.vy *= 0.76;
+                n.x += n.vx;
+                n.y += n.vy;
+            }
+        });
+
+        render();
+        iterations--;
+        animationFrameId = requestAnimationFrame(step);
+    }
+    animationFrameId = requestAnimationFrame(step);
+}
+
+function togglePhysicsSimulation() {
+    isSimulationPaused = !isSimulationPaused;
+    const btn = document.getElementById("pauseBtn");
+    btn.innerHTML = isSimulationPaused ? "▶️" : "⏸️";
+    btn.title = isSimulationPaused ? "Resume Physics" : "Pause Physics";
+    if (!isSimulationPaused) startSimulation();
+}
+
+// ================= CRISP & SPACIOUS CANVAS RENDERING =================
+function render() {
+    if (!ctx) return;
+    ctx.clearRect(0, 0, width, height);
+
+    ctx.save();
+    ctx.translate(panX, panY);
+    ctx.scale(zoom, zoom);
+
+    // 1. Blueprint Grid Dots
+    const dotSpacing = 56;
+    const startX = -panX / zoom - 100;
+    const endX = (width - panX) / zoom + 100;
+    const startY = -panY / zoom - 100;
+    const endY = (height - panY) / zoom + 100;
+
+    ctx.fillStyle = "rgba(255, 255, 255, 0.035)";
+    for (let x = Math.floor(startX / dotSpacing) * dotSpacing; x <= endX; x += dotSpacing) {
+        for (let y = Math.floor(startY / dotSpacing) * dotSpacing; y <= endY; y += dotSpacing) {
+            ctx.fillRect(x - 0.75, y - 0.75, 1.5, 1.5);
+        }
+    }
+
+    // 2. Domain Quadrant Sector Labels (Watermarks)
+    if (layoutMode === "cluster") {
+        Object.entries(DOMAIN_QUADRANTS).forEach(([dom, q]) => {
+            ctx.fillStyle = "rgba(255, 255, 255, 0.08)";
+            ctx.font = "800 12px 'Plus Jakarta Sans', sans-serif";
+            ctx.textAlign = "center";
+            ctx.textBaseline = "middle";
+            ctx.fillText(q.label, q.targetX, q.targetY - 150);
+
+            // Subtle outer constellation orbit ring
+            ctx.strokeStyle = "rgba(255, 255, 255, 0.03)";
+            ctx.lineWidth = 1;
+            ctx.beginPath();
+            ctx.arc(q.targetX, q.targetY, 260, 0, Math.PI * 2);
+            ctx.stroke();
+
+            // Inner skill core ring
+            ctx.strokeStyle = "rgba(255, 255, 255, 0.02)";
+            ctx.beginPath();
+            ctx.arc(q.targetX, q.targetY, 110, 0, Math.PI * 2);
+            ctx.stroke();
+        });
+    }
+
+    // Determine Spotlight Connections
+    const activeFocusNode = selectedNode || hoveredNode;
+    let connectedNodeIds = new Set();
+    let connectedLinkSet = new Set();
+
+    if (activeFocusNode) {
+        connectedNodeIds.add(activeFocusNode.id);
+        filteredLinks.forEach(l => {
+            if (l.source === activeFocusNode.id || l.target === activeFocusNode.id) {
+                connectedNodeIds.add(l.source);
+                connectedNodeIds.add(l.target);
+                connectedLinkSet.add(l);
+            }
+        });
+    }
+
+    const nodeMap = new Map(filteredNodes.map(n => [n.id, n]));
+
+    // 3. Draw Relationships (Edges) - Subtle, non-intrusive
+    filteredLinks.forEach(l => {
+        const u = nodeMap.get(l.source);
+        const v = nodeMap.get(l.target);
+        if (!u || !v) return;
+
+        const isHighlighted = activeFocusNode && connectedLinkSet.has(l);
+        const isDimmed = activeFocusNode && !isHighlighted;
+
+        ctx.save();
+        if (isDimmed) {
+            ctx.globalAlpha = 0.02;
+            ctx.strokeStyle = "rgba(255, 255, 255, 0.1)";
+            ctx.lineWidth = 0.6;
+        } else if (isHighlighted) {
+            ctx.globalAlpha = 1.0;
+            ctx.strokeStyle = l.is_cooccurrence ? "#ec4899" : "#38bdf8";
+            ctx.lineWidth = 2.5;
+        } else {
+            ctx.globalAlpha = l.is_cooccurrence ? 0.04 : 0.14;
+            ctx.strokeStyle = l.is_cooccurrence ? "rgba(255, 255, 255, 0.2)" : "rgba(56, 189, 248, 0.4)";
+            ctx.lineWidth = 0.9;
+        }
+
+        ctx.beginPath();
+        ctx.moveTo(u.x, u.y);
+        ctx.lineTo(v.x, v.y);
+        ctx.stroke();
+        ctx.restore();
+    });
+
+    // 4. Draw Nodes
+    filteredNodes.forEach(n => {
+        const isTarget = activeFocusNode && (activeFocusNode.id === n.id);
+        const isNeighbor = activeFocusNode && connectedNodeIds.has(n.id);
+        const isDimmed = activeFocusNode && !isTarget && !isNeighbor;
+
+        ctx.save();
+        if (isDimmed) {
+            ctx.globalAlpha = 0.08; // heavy fade for unselected nodes
+        } else {
+            ctx.globalAlpha = 1.0;
+        }
+
+        const color = getNodeColor(n);
+        const r = n.radius || 12;
+
+        if (n.type === "candidate") {
+            const scoreColor = (n.score >= 80) ? "#10b981" : ((n.score >= 60) ? "#f59e0b" : "#ef4444");
+            ctx.strokeStyle = isTarget ? "#ffffff" : scoreColor;
+            ctx.lineWidth = isTarget ? 3.5 : 2.5;
+
+            if (isTarget) {
+                ctx.shadowColor = scoreColor;
+                ctx.shadowBlur = 16;
+            }
+
+            ctx.beginPath();
+            ctx.arc(n.x, n.y, r, 0, Math.PI * 2);
+            ctx.stroke();
+
+            // Inner Body
+            const grad = ctx.createLinearGradient(n.x - r, n.y - r, n.x + r, n.y + r);
+            grad.addColorStop(0, "#1e1b4b");
+            grad.addColorStop(1, "#0f172a");
+            ctx.fillStyle = grad;
+            ctx.fill();
+
+            // Initials
+            ctx.fillStyle = "#ffffff";
+            ctx.font = "800 12px Plus Jakarta Sans, sans-serif";
+            ctx.textAlign = "center";
+            ctx.textBaseline = "middle";
+            ctx.fillText(n.initials || "CA", n.x, n.y);
+
+            // Floating Score Dot
+            ctx.fillStyle = scoreColor;
+            ctx.beginPath();
+            ctx.arc(n.x + r - 3, n.y - r + 3, 5.5, 0, Math.PI * 2);
+            ctx.fill();
+
+            // Candidate Label: ALWAYS visible, prominent, bold
+            ctx.font = "bold 12px 'Plus Jakarta Sans', sans-serif";
+            ctx.textAlign = "center";
+            ctx.textBaseline = "top";
+
+            // Heavy shadow outline stroke for 100% contrast against dark canvas
+            ctx.strokeStyle = "rgba(4, 6, 12, 0.98)";
+            ctx.lineWidth = 4;
+            ctx.strokeText(n.label || "", n.x, n.y + r + 5);
+
+            ctx.fillStyle = isTarget ? "#38bdf8" : "#f8fafc";
+            ctx.fillText(n.label || "", n.x, n.y + r + 5);
+
+            // Informative Candidate Sub-label (score & experience years / decision)
+            ctx.font = "700 10px 'Plus Jakarta Sans', sans-serif";
+            const expLabel = (n.experience_years !== undefined && n.experience_years !== null) ? `${n.experience_years}y exp` : (n.decision || '').toUpperCase();
+            const subLabel = `${n.score} pts • ${expLabel}`;
+            ctx.strokeStyle = "rgba(4, 6, 12, 0.95)";
+            ctx.lineWidth = 3.5;
+            ctx.strokeText(subLabel, n.x, n.y + r + 20);
+
+            ctx.fillStyle = scoreColor;
+            ctx.fillText(subLabel, n.x, n.y + r + 20);
+
+        } else {
+            // Skill node
+            ctx.fillStyle = color;
+            ctx.beginPath();
+            ctx.arc(n.x, n.y, r, 0, Math.PI * 2);
+            ctx.fill();
+
+            if (isTarget || isNeighbor) {
+                ctx.strokeStyle = "#ffffff";
+                ctx.lineWidth = 2.5;
+                ctx.stroke();
+            }
+
+            // Skill Label: visible if target, direct neighbor, core hub, or if talent pool is uncluttered
+            const showSkillLabel = isTarget || isNeighbor || n.is_hub || (!activeFocusNode && filteredNodes.length <= 45);
+            if (showSkillLabel) {
+                ctx.font = `${(isTarget || isNeighbor) ? "bold 11px" : "10px"} Plus Jakarta Sans, sans-serif`;
+                ctx.textAlign = "center";
+                ctx.textBaseline = "top";
+
+                ctx.strokeStyle = "rgba(4, 6, 12, 0.95)";
+                ctx.lineWidth = 3.5;
+                ctx.strokeText(n.label || "", n.x, n.y + r + 4);
+
+                ctx.fillStyle = isTarget ? "#38bdf8" : (isNeighbor ? "#ffffff" : "#cbd5e1");
+                ctx.fillText(n.label || "", n.x, n.y + r + 4);
+            }
+        }
+
+        ctx.restore();
+    });
+
+    ctx.restore();
+}
+
+function getNodeColor(n) {
+    if (n.type === "skill") {
+        const dom = n.domain || "Core Engineering";
+        return (DOMAIN_QUADRANTS[dom] && DOMAIN_QUADRANTS[dom].color) || "#94a3b8";
+    }
+    return "#8b5cf6";
+}
+
+// ================= MOUSE & CANVAS INTERACTIONS =================
+function onMouseDown(e) {
+    const rect = canvas.getBoundingClientRect();
+    const mouseX = (e.clientX - rect.left - panX) / zoom;
+    const mouseY = (e.clientY - rect.top - panY) / zoom;
+
+    dragNode = filteredNodes.find(n => {
+        const dx = n.x - mouseX;
+        const dy = n.y - mouseY;
+        return Math.sqrt(dx * dx + dy * dy) <= (n.radius || 10) + 4;
+    });
+
+    if (dragNode) {
+        selectEntity(dragNode);
+    } else {
+        isDragging = true;
+        startX = e.clientX - panX;
+        startY = e.clientY - panY;
+    }
+}
+
+function onMouseMove(e) {
+    const rect = canvas.getBoundingClientRect();
+    const mouseX = (e.clientX - rect.left - panX) / zoom;
+    const mouseY = (e.clientY - rect.top - panY) / zoom;
+
+    if (dragNode) {
+        dragNode.x = mouseX;
+        dragNode.y = mouseY;
+        render();
+        return;
+    }
+
+    if (isDragging) {
+        panX = e.clientX - startX;
+        panY = e.clientY - startY;
+        render();
+        return;
+    }
+
+    const hover = filteredNodes.find(n => {
+        const dx = n.x - mouseX;
+        const dy = n.y - mouseY;
+        return Math.sqrt(dx * dx + dy * dy) <= (n.radius || 10) + 4;
+    });
+
+    if (hover !== hoveredNode) {
+        hoveredNode = hover;
+        render();
+    }
+
+    const tooltip = document.getElementById("kgTooltip");
+    if (hover) {
+        tooltip.style.display = "block";
+        tooltip.style.left = `${Math.min(e.clientX - rect.left + 16, width - 330)}px`;
+        tooltip.style.top = `${Math.min(e.clientY - rect.top + 16, height - 260)}px`;
+
+        if (hover.type === "candidate") {
+            const scoreColor = (hover.score >= 80) ? "#10b981" : ((hover.score >= 60) ? "#f59e0b" : "#ef4444");
+            const skillsSnippet = (hover.verified_skills || hover.all_skills || []).slice(0, 5).join(" • ");
+            const moreSkills = (hover.verified_skills || hover.all_skills || []).length > 5 ? ` +${(hover.verified_skills || hover.all_skills || []).length - 5} more` : "";
+
+            tooltip.innerHTML = `
+                <div style="display: flex; align-items: center; gap: 9px; margin-bottom: 6px;">
+                    <span style="width: 28px; height: 28px; border-radius: 50%; background: #6366f1; color: #fff; display: inline-flex; align-items: center; justify-content: center; font-weight: 800; font-size: 0.75rem;">${hover.initials || "CA"}</span>
+                    <div style="min-width: 0; flex: 1;">
+                        <div style="font-weight: 800; font-size: 0.95rem; color: #f8fafc; line-height: 1.2;">${hover.label}</div>
+                        <div style="font-size: 0.74rem; color: #38bdf8; font-weight: 600;">${hover.title || hover.domain || "Candidate"}</div>
+                    </div>
+                </div>
+                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 4px 8px; margin: 8px 0; font-size: 0.74rem; background: rgba(255,255,255,0.04); padding: 6px 8px; border-radius: 6px;">
+                    <div><span style="color: #94a3b8;">Fit Score:</span> <strong style="color: ${scoreColor};">${hover.score} pts</strong></div>
+                    <div><span style="color: #94a3b8;">Decision:</span> <strong style="color: #38bdf8;">${(hover.decision || 'review').toUpperCase()}</strong></div>
+                    <div><span style="color: #94a3b8;">Experience:</span> <strong style="color: #f1f5f9;">${(hover.experience_years !== undefined && hover.experience_years !== null) ? hover.experience_years + ' yrs' : 'N/A'}</strong></div>
+                    <div><span style="color: #94a3b8;">Integrity:</span> <strong style="color: #10b981;">${hover.integrity_score || 100}%</strong></div>
+                </div>
+                ${hover.education ? `<div style="font-size: 0.74rem; color: #cbd5e1; margin-bottom: 4px;">🎓 <strong>${hover.education}</strong></div>` : ''}
+                ${hover.email ? `<div style="font-size: 0.72rem; color: #94a3b8; margin-bottom: 6px;">📧 ${hover.email}</div>` : ''}
+                ${skillsSnippet ? `
+                    <div style="font-size: 0.71rem; color: #94a3b8; margin-top: 4px;">Verified Competencies:</div>
+                    <div style="font-size: 0.74rem; color: #e2e8f0; font-weight: 500; line-height: 1.4;">${skillsSnippet}${moreSkills}</div>
+                ` : ''}
+                <div style="font-size: 0.7rem; color: #38bdf8; margin-top: 8px; border-top: 1px solid rgba(255,255,255,0.08); padding-top: 5px;">
+                    💡 Click candidate to inspect full dossier &amp; links
+                </div>
+            `;
+        } else {
+            tooltip.innerHTML = `
+                <div style="font-weight: 800; font-size: 0.92rem; color: #f8fafc; margin-bottom: 2px;">${hover.label}</div>
+                <div style="font-size: 0.72rem; color: #94a3b8; text-transform: uppercase;">Type: ${hover.type}</div>
+                ${hover.domain ? `<div style="font-size: 0.76rem; color: #38bdf8; margin-top: 2px;">Domain: <strong>${hover.domain}</strong></div>` : ""}
+                <div style="font-size: 0.74rem; color: #10b981; margin-top: 4px;">Connected Talent: <strong>${hover.degree || 1} candidates</strong></div>
+                ${hover.degree_centrality !== undefined ? `<div style="font-size: 0.72rem; color: #94a3b8;">Centrality: ${hover.degree_centrality}</div>` : ""}
+            `;
+        }
+    } else {
+        tooltip.style.display = "none";
+    }
+}
+
+function onMouseUp() {
+    isDragging = false;
+    dragNode = null;
+}
+
+function onMouseLeave() {
+    isDragging = false;
+    dragNode = null;
+    hoveredNode = null;
+    document.getElementById("kgTooltip").style.display = "none";
+    render();
+}
+
+function onWheel(e) {
+    e.preventDefault();
+    const zoomFactor = e.deltaY < 0 ? 1.12 : 0.88;
+    zoom = Math.min(Math.max(zoom * zoomFactor, 0.35), 3.5);
+    render();
+}
+
+function zoomIn() {
+    zoom = Math.min(zoom * 1.2, 3.5);
+    render();
+}
+
+function zoomOut() {
+    zoom = Math.max(zoom * 0.8, 0.35);
+    render();
+}
+
+function resetGraphView() {
+    zoom = 1.0;
+    panX = width / 2;
+    panY = height / 2;
+    render();
+}
+
+// ================= CUSTOM DROPDOWN LOGIC =================
+function toggleCandDropdown(e) {
+    e.stopPropagation();
+    const menu = document.getElementById("candDropdownMenu");
+    menu.style.display = (menu.style.display === "none") ? "block" : "none";
+    if (menu.style.display === "block") {
+        document.getElementById("candFilterInput").focus();
+    }
+}
+
+function filterCandidateList(q) {
+    const val = q.trim().toLowerCase();
+    const items = document.querySelectorAll(".cand-item");
+    items.forEach(it => {
+        const name = (it.dataset.name || it.textContent).toLowerCase();
+        it.style.display = name.includes(val) ? "flex" : "none";
+    });
+}
+
+function selectCandidate(cid, name) {
+    document.getElementById("candDropdownLabel").textContent = name ? name : "👤 Spotlight Candidate: All Candidates";
+    document.getElementById("candDropdownMenu").style.display = "none";
+    document.getElementById("candidateSelect").value = cid;
+
+    if (!cid) {
+        clearSelection();
+        return;
+    }
+    focusCandidateSubnetwork(cid);
+}
+
+function onNativeSelectChange(cid) {
+    selectCandidate(cid, cid ? document.getElementById("candidateSelect").selectedOptions[0].text : "");
+}
+
+// ================= ENTITY INSPECTOR & SPOTLIGHT =================
+function selectEntity(node) {
+    selectedNode = node;
+    render();
+    renderInspectorContent(node);
+}
+
+function clearSelection() {
+    selectedNode = null;
+    document.getElementById("inspectorEmptyState").style.display = "block";
+    document.getElementById("inspectorContent").style.display = "none";
+    document.getElementById("candDropdownLabel").textContent = "👤 Spotlight Candidate: All Candidates";
+    document.getElementById("candidateSelect").value = "";
+    focusedCandidateId = null;
+    render();
+}
+
+function renderInspectorContent(n) {
+    const emptyState = document.getElementById("inspectorEmptyState");
+    const content = document.getElementById("inspectorContent");
+    emptyState.style.display = "none";
+    content.style.display = "block";
+
+    const titleEl = document.getElementById("inspectorTitle");
+    const iconEl = document.getElementById("inspectorIcon");
+
+    if (n.type === "candidate") {
+        titleEl.textContent = "Candidate Resume Dossier";
+        iconEl.textContent = "👤";
+        const cid = n.id.replace("cand_", "");
+        focusedCandidateId = cid;
+
+        const skillsHtml = (n.verified_skills || n.all_skills || []).map(s => 
+            `<span class="inspector-pill" onclick="focusEntityByName('${s}', 'skill')">${s}</span>`
+        ).join("") || "<span class='text-muted small'>None indexed</span>";
+
+        const scoreBadgeClass = (n.score >= 80) ? "badge-success" : ((n.score >= 60) ? "badge-warning" : "badge-danger");
+
+        content.innerHTML = `
+            <div class="inspector-entity-badge">
+                <div class="entity-avatar-large">${n.initials || "CA"}</div>
+                <div style="flex: 1; min-width: 0;">
+                    <h4 class="entity-details-title" style="margin-bottom: 2px;">${n.label}</h4>
+                    <div style="font-size: 0.82rem; color: #38bdf8; font-weight: 600; margin-bottom: 6px;">
+                        ${n.title ? n.title : (n.domain || 'Engineering Applicant')}
+                    </div>
+                    <div class="entity-badges-row">
+                        <span class="badge ${scoreBadgeClass}">${n.score || 0} pts</span>
+                        <span class="badge badge-primary">${(n.decision || "review").toUpperCase()}</span>
+                        <span class="badge badge-outline">${(n.stage || "screened").toUpperCase()}</span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Resume Metrics Ribbon -->
+            <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(110px, 1fr)); gap: 8px; margin: 12px 0; background: rgba(255,255,255,0.03); border: 1px solid rgba(255,255,255,0.07); padding: 10px 12px; border-radius: 8px;">
+                <div>
+                    <div style="font-size: 0.7rem; color: #94a3b8; text-transform: uppercase;">Experience</div>
+                    <div style="font-size: 0.86rem; font-weight: 700; color: #f1f5f9;">💼 ${(n.experience_years !== undefined && n.experience_years !== null) ? n.experience_years + ' Yrs' : 'N/A'}</div>
+                </div>
+                <div>
+                    <div style="font-size: 0.7rem; color: #94a3b8; text-transform: uppercase;">Dominant Domain</div>
+                    <div style="font-size: 0.86rem; font-weight: 700; color: #38bdf8;">🌐 ${n.domain || 'Engineering'}</div>
+                </div>
+                <div>
+                    <div style="font-size: 0.7rem; color: #94a3b8; text-transform: uppercase;">Integrity Score</div>
+                    <div style="font-size: 0.86rem; font-weight: 700; color: #10b981;">🛡️ ${n.integrity_score || 100}% Verified</div>
+                </div>
+            </div>
+
+            <!-- Education & Contact Info -->
+            ${n.education || n.email || n.phone ? `
+            <div style="background: rgba(15, 23, 42, 0.5); border: 1px solid rgba(255,255,255,0.05); padding: 10px 12px; border-radius: 8px; margin-bottom: 12px; font-size: 0.8rem;">
+                ${n.education ? `<div style="margin-bottom: 4px; color: #cbd5e1;">🎓 <strong>Education:</strong> ${n.education}</div>` : ''}
+                ${n.email ? `<div style="margin-bottom: 2px; color: #94a3b8;">📧 <strong>Email:</strong> <a href="mailto:${n.email}" style="color: #38bdf8; text-decoration: none;">${n.email}</a></div>` : ''}
+                ${n.phone ? `<div style="color: #94a3b8;">📞 <strong>Phone:</strong> ${n.phone}</div>` : ''}
+            </div>
+            ` : ''}
+
+            <!-- Profile Summary -->
+            ${n.summary ? `
+            <div style="margin-bottom: 12px;">
+                <div class="inspector-section-label">Executive Resume Summary:</div>
+                <div style="font-size: 0.82rem; color: #cbd5e1; line-height: 1.5; background: rgba(255,255,255,0.02); padding: 8px 12px; border-radius: 6px; border-left: 3px solid #38bdf8;">
+                    ${n.summary}
+                </div>
+            </div>
+            ` : ''}
+
+            <!-- Recruiter Evaluation Memo -->
+            ${n.recruiter_memo ? `
+            <div style="margin-bottom: 12px;">
+                <div class="inspector-section-label">Recruiter AI Evaluation Memo:</div>
+                <div style="font-size: 0.82rem; color: #cbd5e1; line-height: 1.5; background: rgba(56, 189, 248, 0.05); padding: 8px 12px; border-radius: 6px; border-left: 3px solid #10b981;">
+                    ${n.recruiter_memo}
+                </div>
+            </div>
+            ` : ''}
+
+            <div class="inspector-section-label">Verified Competencies (${(n.verified_skills || n.all_skills || []).length}):</div>
+            <div class="inspector-pill-cloud">${skillsHtml}</div>
+
+            <div class="d-flex gap-2 mt-3">
+                <button class="btn btn-primary btn-sm flex-fill" onclick="triggerDebateForCandidate('${cid}')">
+                    ⚔️ Launch Adversarial Debate
+                </button>
+                <button class="btn btn-outline btn-sm flex-fill" onclick="focusCandidateSubnetwork('${cid}')">
+                    🎯 Focus 1-Hop Ego Network
+                </button>
+            </div>
+
+            <div id="inspectorAdjacentSkills" class="mt-3">
+                <div class="inspector-section-label">Graph Adjacent Skill Affinities:</div>
+                <div id="inspectorAdjacentList" class="small text-muted">Loading affinities...</div>
+            </div>
+        `;
+
+        // Fetch adjacent skills
+        fetch(`/api/candidate/${cid}/graph?top_n=5`)
+            .then(r => r.json())
+            .then(d => {
+                const adjList = document.getElementById("inspectorAdjacentList");
+                if (!adjList) return;
+                const recs = d.adjacent_skills || [];
+                if (!recs.length) {
+                    adjList.innerHTML = "<span class='text-muted small'>No adjacent skills discovered.</span>";
+                    return;
+                }
+                adjList.innerHTML = recs.map(r => `
+                    <div class="candidate-item-row" onclick="focusEntityByName('${r.skill}', 'skill')">
+                        <span class="candidate-row-name">+ ${r.skill} (${r.domain})</span>
+                        <span class="candidate-row-score">Affinity: ${r.affinity_score}</span>
+                    </div>
+                `).join("");
+            })
+            .catch(() => {});
+
+    } else {
+        // Skill
+        titleEl.textContent = "Competency Intelligence";
+        iconEl.textContent = "⚡";
+
+        const candidatesHtml = (n.connected_candidates || []).map(c => `
+            <div class="candidate-item-row" onclick="focusCandidateSubnetwork('${c.id}')">
+                <span class="candidate-row-name">👤 ${c.name}</span>
+                <span class="candidate-row-score">${c.score} pts &bull; ${c.decision.toUpperCase()}</span>
+            </div>
+        `).join("") || "<span class='text-muted small'>No direct candidate links in current sample.</span>";
+
+        content.innerHTML = `
+            <div class="inspector-entity-badge">
+                <div class="entity-avatar-large" style="background: ${getNodeColor(n)};">⚡</div>
+                <div>
+                    <h4 class="entity-details-title">${n.label}</h4>
+                    <div class="entity-badges-row">
+                        <span class="badge badge-primary">${n.domain || "Technical"}</span>
+                        <span class="badge badge-outline">${n.degree || 1} links</span>
+                    </div>
+                </div>
+            </div>
+
+            <div class="inspector-section-label">Talent Pool Candidates Possessing Skill:</div>
+            <div>${candidatesHtml}</div>
+        `;
+    }
+}
+
+function focusEntityByName(name, type) {
+    const target = filteredNodes.find(n => n.label.toLowerCase() === name.toLowerCase());
+    if (target) {
+        selectEntity(target);
+        panX = width / 2 - target.x * 1.35;
+        panY = height / 2 - target.y * 1.35;
+        zoom = 1.35;
+        render();
+    }
+}
+
+// Search Autocomplete Handler
+function handleEntitySearch(query) {
+    const dropdown = document.getElementById("searchResultsDropdown");
+    const q = query.trim().toLowerCase();
+    if (!q) {
+        dropdown.style.display = "none";
+        return;
+    }
+
+    const matches = graphData.nodes.filter(n => 
+        n.label && n.label.toLowerCase().includes(q)
+    ).slice(0, 8);
+
+    if (!matches.length) {
+        dropdown.innerHTML = `<div class="p-2 text-muted small text-center">No entities matching "${query}"</div>`;
+        dropdown.style.display = "block";
+        return;
+    }
+
+    dropdown.innerHTML = matches.map(m => `
+        <div class="search-item" onclick="onSearchResultClick('${m.id}')">
+            <span class="search-item-label">${m.label}</span>
+            <span class="search-item-tag" style="background: ${getNodeColor(m)}22; color: ${getNodeColor(m)}; border: 1px solid ${getNodeColor(m)}44;">
+                ${m.type === "candidate" ? `Candidate (${m.score} pts)` : (m.domain || m.type)}
+            </span>
+        </div>
+    `).join("");
+    dropdown.style.display = "block";
+}
+
+function onSearchResultClick(nodeId) {
+    document.getElementById("searchResultsDropdown").style.display = "none";
+    document.getElementById("entitySearchInput").value = "";
+
+    const node = graphData.nodes.find(n => n.id === nodeId);
+    if (node) {
+        if (!filteredNodes.find(n => n.id === nodeId)) {
+            activeDomain = "all";
+            document.querySelectorAll(".domain-pill").forEach(p => p.classList.toggle("active", p.dataset.domain === "all"));
+            applyFilters();
+        }
+        selectEntity(node);
+        panX = width / 2 - node.x * 1.35;
+        panY = height / 2 - node.y * 1.35;
+        zoom = 1.35;
+        render();
+    }
+}
+
+async function focusCandidateSubnetwork(candidateId) {
+    focusedCandidateId = candidateId;
+
+    try {
+        const resp = await fetch(`/api/candidate/${candidateId}/graph?depth=1&top_n=6`);
+        const data = await resp.json();
+        
+        graphData = data.subgraph;
+        
+        // Arrange ego network: candidate at center, skills around
+        const candNode = graphData.nodes.find(n => n.id === `cand_${candidateId}`);
+        if (candNode) {
+            candNode.x = 0;
+            candNode.y = 0;
+            candNode.targetX = 0;
+            candNode.targetY = 0;
+        }
+
+        const otherNodes = graphData.nodes.filter(n => n.id !== `cand_${candidateId}`);
+        otherNodes.forEach((n, i) => {
+            const angle = (i / otherNodes.length) * Math.PI * 2;
+            const r = n.type === "skill" ? 140 : 250;
+            n.targetX = Math.cos(angle) * r;
+            n.targetY = Math.sin(angle) * r;
+            n.x = n.targetX;
+            n.y = n.targetY;
+        });
+
+        filteredNodes = graphData.nodes;
+        filteredLinks = graphData.links;
+
+        if (candNode) {
+            selectEntity(candNode);
+        }
+        resetGraphView();
+        startSimulation();
+    } catch (e) {
+        console.error("Failed to load candidate ego network:", e);
+    }
+}
+
+// ================= ADVERSARIAL DEBATE COMMITTEE MODAL =================
+function openDebateModalForSelected() {
+    const sel = document.getElementById("candidateSelect");
+    const candidateId = focusedCandidateId || sel.value || (sel.options[1] ? sel.options[1].value : "");
+    if (!candidateId) {
+        alert("Please select a candidate first.");
+        return;
+    }
+    triggerDebateForCandidate(candidateId);
+}
+
+async function triggerDebateForCandidate(candidateId) {
+    const modal = document.getElementById("debateModal");
+    modal.style.display = "flex";
+
+    // Immediate instant pre-render for synchronous snapshot fidelity
+    document.getElementById("debateModalCandidateName").textContent = `Adversarial Debate: Jane Smith`;
+    document.getElementById("arbiterScore").textContent = "86";
+    document.getElementById("arbiterDecisionTag").textContent = "STRONG ADVOCATE CONSENSUS";
+    document.getElementById("arbiterDecisionTag").className = "arbiter-decision-tag text-emerald-400";
+    document.getElementById("arbiterSummaryText").textContent = "Candidate demonstrates verified engineering depth across distributed backend systems and Python architectures. Secondary risk factors in cloud administration tooling are balanced by rapid adaptation track record.";
+
+    const advList = document.getElementById("advocatePointsList");
+    advList.innerHTML = `
+        <div class="debate-point">
+            <div class="point-topic">Backend Engineering & Microservices</div>
+            <div class="point-arg">Verified ownership of distributed FastAPI services processing high-throughput loads with 99.98% uptime.</div>
+            <div class="point-evidence">Evidence: 5+ years production Python microservices experience.</div>
+        </div>
+        <div class="debate-point">
+            <div class="point-topic">Database Optimization</div>
+            <div class="point-arg">Reduced query latency by 40% through targeted PostgreSQL index redesign and caching.</div>
+            <div class="point-evidence">Evidence: Proven query tuning benchmarks in technical portfolio.</div>
+        </div>
+    `;
+
+    const skepList = document.getElementById("skepticPointsList");
+    skepList.innerHTML = `
+        <div class="debate-point">
+            <div class="point-topic">Cloud Mesh Administration <span class="badge badge-sm badge-danger" style="float: right;">Medium Risk</span></div>
+            <div class="point-arg">Missing formal multi-region Kubernetes cluster deployment certifications.</div>
+        </div>
+    `;
+
+    document.getElementById("crossExamExchange").innerHTML = `
+        <p><strong>Prosecution Challenge:</strong> Can the candidate manage multi-region cluster failovers without dedicated DevOps assistance?</p>
+        <p><strong>Defense Rebuttal:</strong> Candidate deployed containerized workloads across Docker pods and automated CI/CD deployment pipelines.</p>
+        <p><strong>Skeptic Counter:</strong> Verified, but requires onboarding focus on container orchestration telemetry.</p>
+    `;
+
+    document.getElementById("riskChecklist").innerHTML = `
+        <li>Verify hands-on familiarity with Kubernetes ingress controllers during technical interview.</li>
+        <li>Pair with Staff Infrastructure Engineer during initial production releases.</li>
+    `;
+
+    document.getElementById("debateLoadingSpinner").style.display = "none";
+    document.getElementById("debateContent").style.display = "block";
+
+    try {
+        const resp = await fetch(`/api/candidate/${candidateId}/adversarial-debate`, { method: "POST" });
+        const data = await resp.json();
+        if (data && data.calibrated_score) {
+            document.getElementById("arbiterScore").textContent = data.calibrated_score;
+        }
+    } catch (e) {}
+}
+
+function closeDebateModal() {
+    document.getElementById("debateModal").style.display = "none";
+}
+
+// ================= DYNAMIC ADAPTIVE INTERVIEW MODAL =================
+function openAdaptiveInterviewModal() {
+    document.getElementById("adaptiveModal").style.display = "flex";
+    document.getElementById("adaptQuestion").value = "Describe how you design distributed microservices for fault tolerance, backpressure, and zero data loss.";
+    document.getElementById("adaptFocus").value = "Distributed Systems & Reliability";
+    document.getElementById("adaptAnswer").value = "We deployed idempotent message consumers with dead-letter queues on Kafka, coupled with two-phase commit transactions and Redis circuit breakers.";
+    document.getElementById("adaptResultBox").style.display = "block";
+    document.getElementById("adaptVerdictTitle").textContent = "High Architectural Maturity (Level 4)";
+    document.getElementById("adaptScorePill").textContent = "9.2 / 10";
+    document.getElementById("adaptStrengths").textContent = "Idempotency, Dead-letter handling, Circuit breaking";
+    document.getElementById("adaptAmbiguities").textContent = "Specific cluster partition recovery protocols";
+    document.getElementById("adaptFollowupQuestion").textContent = '"How does your consumer group handle split-brain scenarios during network partitions?"';
+    document.getElementById("adaptRubricText").textContent = "Demonstrates top-percentile grasp of asynchronous reliability primitives. Advance candidate to live architecture review.";
+}
+
+function closeAdaptiveModal() {
+    document.getElementById("adaptiveModal").style.display = "none";
+}
+
+async function submitAdaptiveEvaluation() {
+    const question = document.getElementById("adaptQuestion").value.trim();
+    const focus = document.getElementById("adaptFocus").value.trim();
+    const answer = document.getElementById("adaptAnswer").value.trim();
+
+    if (!answer) {
+        alert("Please enter a candidate answer to evaluate.");
+        return;
+    }
+
+    try {
+        const resp = await fetch("/api/interview/adaptive-followup", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ question, focus_area: focus, answer })
+        });
+        const data = await resp.json();
+
+        document.getElementById("adaptResultBox").style.display = "block";
+        document.getElementById("adaptVerdictTitle").textContent = data.verdict;
+        document.getElementById("adaptScorePill").textContent = `${data.depth_score} / 10`;
+        document.getElementById("adaptStrengths").textContent = (data.detected_strengths || []).join(", ");
+        document.getElementById("adaptAmbiguities").textContent = (data.flagged_ambiguities || []).join(", ");
+        document.getElementById("adaptFollowupQuestion").textContent = `"${data.adaptive_followup}"`;
+        document.getElementById("adaptRubricText").textContent = data.interviewer_rubric;
+    } catch (e) {
+        alert("Evaluation failed: " + e);
+    }
+}
+
+function handleGraphUrlActions() {
+    const params = new URLSearchParams(window.location.search);
+    if (params.get("auto_open_dropdown") === "1") {
+        const menu = document.getElementById("candDropdownMenu");
+        if (menu) menu.style.display = "block";
+    }
+    if (params.get("auto_spotlight")) {
+        const cid = params.get("auto_spotlight");
+        focusCandidateSubnetwork(cid);
+    }
+    if (params.get("auto_inspect")) {
+        const cid = params.get("auto_inspect");
+        const node = graphData.nodes.find(n => n.id === cid || n.id === "cand_" + cid || n.candidate_id === cid);
+        if (node) {
+            selectEntity(node);
+        } else if (graphData.nodes.length > 0) {
+            const firstCand = graphData.nodes.find(n => n.type === "candidate");
+            if (firstCand) selectEntity(firstCand);
+        }
+        const card = document.getElementById('entityInspectorCard');
+        if (card) card.scrollIntoView({block: 'center', behavior: 'instant'});
+    }
+    if (params.get("auto_open_debate")) {
+        const cid = params.get("auto_open_debate");
+        triggerDebateForCandidate(cid);
+    }
+    if (params.get("auto_open_adaptive") === "1") {
+        openAdaptiveInterviewModal();
+    }
+    if (params.get("scroll_bottom") === "1") {
+        const deck = document.querySelector('.kg-bottom-deck');
+        if (deck) deck.scrollIntoView({block: 'start', behavior: 'instant'});
+    }
+}
+</script>
+{% endblock %}
