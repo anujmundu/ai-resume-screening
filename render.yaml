@@ -1,0 +1,25 @@
+# ==============================================================================
+# Render Infrastructure Blueprint: TalentAI Enterprise Platform
+# Automated One-Click Cloud Deployment Specification
+# ==============================================================================
+
+services:
+  - type: web
+    name: ai-resume-screening
+    runtime: python
+    plan: free
+    region: oregon
+    buildCommand: pip install --upgrade pip && pip install -r requirements.txt
+    startCommand: gunicorn --bind 0.0.0.0:$PORT --workers 2 --timeout 120 app:app
+    healthCheckPath: /
+    envVars:
+      - key: PYTHON_VERSION
+        value: 3.11.9
+      - key: FLASK_ENV
+        value: production
+      - key: SECRET_KEY
+        generateValue: true
+      - key: JWT_SECRET_KEY
+        generateValue: true
+      - key: STORAGE_MODE
+        value: sqlite
