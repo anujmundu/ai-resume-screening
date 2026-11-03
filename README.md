@@ -1,5 +1,7 @@
 # TalentAI &bull; Enterprise AI Resume Screening & ATS Intelligence
 
+[![Live Demo](https://img.shields.io/badge/Live%20Demo-Render-46E3B7.svg?style=flat&logo=render&logoColor=white)](https://ai-resume-screening.onrender.com)
+[![Release](https://img.shields.io/badge/Release-v1.0.0-success.svg)](https://github.com/anujmundu/ai-resume-screening/releases)
 [![Python](https://img.shields.io/badge/Python-3.10%2B-blue.svg)](https://www.python.org/)
 [![Flask](https://img.shields.io/badge/Flask-3.0%2B-black.svg)](https://flask.palletsprojects.com/)
 [![Docker](https://img.shields.io/badge/Docker-Ready-2496ED.svg)](Dockerfile)
